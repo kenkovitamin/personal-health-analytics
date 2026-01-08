@@ -1,9 +1,11 @@
 import express from "express";
 import pg from "pg";
 import bodyParser from "body-parser";
+import jwt from "jsonwebtoken";
 
 const app = express();
 app.use(bodyParser.json());
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
@@ -39,10 +41,17 @@ app.post("/register", async (req, res) => {
     );
     client.release();
 
-    res.json({
-      message: "User registered",
-      user: result.rows[0],
-      token: "fake-jwt-token-for-testing"
+   const token = jwt.sign(
+  { userId: result.rows[0].id },
+  JWT_SECRET,
+  { expiresIn: "7d" }
+);
+
+res.json({
+  message: "User registered",
+  token
+});
+
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
