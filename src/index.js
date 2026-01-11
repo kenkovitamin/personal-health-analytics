@@ -7,6 +7,23 @@ import bcrypt from "bcrypt";
 const app = express();
 app.use(bodyParser.json());
 const JWT_SECRET = process.env.JWT_SECRET;
+const authMiddleware = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "No token provided" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+};
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
@@ -98,8 +115,12 @@ app.post("/login", async (req, res) => {
 });
 
 // Get user profile
-app.get("/profile/:userId", async (req, res) => {
-  const { userId } = req.params;
+app.get("/profile", authMiddleware, async (req, res) => {
+  const result = await client.query(
+  "SELECT id, email FROM users WHERE id = $1",
+  [req.user.userId]
+);
+
   try {
     const client = await pool.connect();
     const result = await client.query(
@@ -117,8 +138,10 @@ app.get("/profile/:userId", async (req, res) => {
 });
 
 // Add record
-app.post("/records", async (req, res) => {
-  const { userId, type, details } = req.body;
+app.post("/records", authMiddleware, async (req, res) => {
+  const { type, details } = req.body;
+  const userId = req.user.userId;
+
   if (!userId || !type || !details) return res.status(400).json({ error: "Missing fields" });
 
   try {
@@ -136,14 +159,13 @@ app.post("/records", async (req, res) => {
 });
 
 // Get all records of a user
-app.get("/records/:userId", async (req, res) => {
-  const { userId } = req.params;
+app.get("/records", authMiddleware, async (req, res) => {
 
   try {
     const client = await pool.connect();
     const result = await client.query(
       "SELECT id, user_id, type, details FROM records WHERE user_id = $1",
-      [userId]
+      [req.user.userId]
     );
     client.release();
 
