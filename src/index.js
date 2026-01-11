@@ -59,6 +59,44 @@ res.json({
   }
 });
 
+// Login user
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password required" });
+  }
+
+  try {
+    const client = await pool.connect();
+    const result = await client.query(
+      "SELECT id, password FROM users WHERE email = $1",
+      [email]
+    );
+    client.release();
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const user = result.rows[0];
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      { userId: user.id },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({ token });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get user profile
 app.get("/profile/:userId", async (req, res) => {
   const { userId } = req.params;
