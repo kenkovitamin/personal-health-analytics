@@ -1,4 +1,5 @@
 import express from "express";
+import { calculateTriage } from "./services/triageService.js";
 import pg from "pg";
 import bodyParser from "body-parser";
 import jwt from "jsonwebtoken";
@@ -170,6 +171,21 @@ app.get("/records", authMiddleware, async (req, res) => {
     client.release();
 
     res.json({ records: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/triage/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const result = await calculateTriage(userId);
+
+    res.json({
+      triage_level: result.level,
+      reasons: result.reasons
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
