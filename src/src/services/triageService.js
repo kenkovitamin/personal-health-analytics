@@ -10,9 +10,7 @@ const rulesPath = path.resolve("rules/triage.rules.json");
 const triageRules = JSON.parse(fs.readFileSync(rulesPath, "utf-8"));
 
 export async function calculateTriage(userId) {
-  // Пока заглушка — логики НЕТ
-  // Это нормально на этом этапе
-
+  
   return {
     level: "LOW",
     reasons: []
