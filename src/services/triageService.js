@@ -1,64 +1,70 @@
 import fs from "fs";
 import path from "path";
-import pg from "pg";
-
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 const rulesPath = path.resolve("src/rules/triage.rules.json");
-const triageRules = JSON.parse(fs.readFileSync(rulesPath, "utf-8"));
+const rulesData = JSON.parse(fs.readFileSync(rulesPath, "utf-8"));
 
-export async function calculateTriage(userId) {
-  const client = await pool.connect();
+export async function runTriage(userFacts) {
+  const { diagnoses, symptoms, lifestyle } = userFacts;
 
-  try {
-    const diagnosesRes = await client.query(
-      `SELECT c.name 
-       FROM user_conditions uc
-       JOIN conditions c ON uc.condition_id = c.id
-       WHERE uc.user_id = $1`,
-      [userId]
-    );
+  let matchedRules = [];
 
-    const diagnoses = diagnosesRes.rows.map(r => r.name);
+  for (const rule of rulesData.rules) {
+    let match = true;
 
-    const symptomsRes = await client.query(
-      `SELECT s.name, us.severity, us.created_at
-       FROM user_symptoms us
-       JOIN symptoms s ON us.symptom_id = s.id
-       WHERE us.user_id = $1
-       ORDER BY us.created_at DESC
-       LIMIT 5`,
-      [userId]
-    );
-
-    const symptoms = symptomsRes.rows;
-
-    const hasDiverticulitis = diagnoses.includes("diverticulitis");
-
-    const hasSeverePain = symptoms.some(
-      s => s.name === "abdominal_pain" && s.severity >= 8
-    );
-
-    const hasFever = symptoms.some(
-      s => s.name === "fever"
-    );
-
-    if (hasDiverticulitis && hasSeverePain && hasFever) {
-      return {
-        level: "EMERGENCY",
-        reasons: ["DIVERTICULITIS_FLARE"]
-      };
+    // diagnoses check
+    if (rule.conditions.diagnoses) {
+      for (const d of rule.conditions.diagnoses) {
+        if (!diagnoses.includes(d)) {
+          match = false;
+        }
+      }
     }
 
-    return {
-      level: "LOW",
-      reasons: []
-    };
+    // lifestyle check
+    if (rule.conditions.lifestyle) {
+      for (const key in rule.conditions.lifestyle) {
+        if (lifestyle[key] !== rule.conditions.lifestyle[key]) {
+          match = false;
+        }
+      }
+    }
 
-  } finally {
-    client.release();
+    // symptoms check
+    if (rule.conditions.symptoms) {
+      for (const key in rule.conditions.symptoms) {
+        if (key === "pain_severity_gte") {
+          const pain = symptoms.find(s => s.name === "abdominal_pain");
+          if (!pain || pain.severity < rule.conditions.symptoms[key]) {
+            match = false;
+          }
+        } else {
+          const exists = symptoms.some(s => s.name === key);
+          if (!exists) {
+            match = false;
+          }
+        }
+      }
+    }
+
+    if (match) matchedRules.push(rule);
   }
+
+  if (matchedRules.length === 0) {
+    return { triage_level: "LOW", reasons: [] };
+  }
+
+  matchedRules.sort(
+    (a, b) =>
+      rulesData.triage_levels_priority.indexOf(a.level) -
+      rulesData.triage_levels_priority.indexOf(b.level)
+  );
+
+  const topRule = matchedRules[0];
+
+  return {
+    triage_level: topRule.level,
+    reasons: [topRule.id]
+  };
 }
 
