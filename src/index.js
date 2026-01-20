@@ -200,16 +200,22 @@ app.post("/triage/:userId", async (req, res) => {
     );
 
     const lifestyleRes = await client.query(
-      `SELECT smoking, alcohol FROM health_profile
+      `SELECT smoking_status, smoking_years, alcohol FROM health_profile
        WHERE user_id = $1`,
       [userId]
     );
 
-    const facts = {
-      diagnoses: diagRes.rows.map(r => r.name),
-      symptoms: symptomsRes.rows,
-      lifestyle: lifestyleRes.rows[0] || {}
-    };
+    const rawLifestyle = lifestyleRes.rows[0] || {};
+
+const facts = {
+  diagnoses: diagRes.rows.map(r => r.name),
+  symptoms: symptomsRes.rows,
+  lifestyle: {
+    smoking: rawLifestyle.smoking_status === 'current',
+    smoking_years: rawLifestyle.smoking_years || 0,
+    alcohol: rawLifestyle.alcohol || 'none'
+  }
+};
 
     const result = await runTriage(facts);
     res.json(result);
