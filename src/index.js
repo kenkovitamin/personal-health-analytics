@@ -1,5 +1,5 @@
 import express from "express";
-import { calculateTriage } from "./services/triageService.js";
+import { runTriage } from "./services/triageService.js";
 import pg from "pg";
 import bodyParser from "body-parser";
 import jwt from "jsonwebtoken";
@@ -179,15 +179,44 @@ app.get("/records", authMiddleware, async (req, res) => {
 app.post("/triage/:userId", async (req, res) => {
   const { userId } = req.params;
 
-  try {
-    const result = await calculateTriage(userId);
+  const client = await pool.connect();
 
-    res.json({
-      triage_level: result.level,
-      reasons: result.reasons
-    });
+  try {
+    const diagRes = await client.query(
+      `SELECT c.name FROM user_conditions uc
+       JOIN conditions c ON uc.condition_id = c.id
+       WHERE uc.user_id = $1`,
+      [userId]
+    );
+
+    const symptomsRes = await client.query(
+      `SELECT s.name, us.severity
+       FROM user_symptoms us
+       JOIN symptoms s ON us.symptom_id = s.id
+       WHERE us.user_id = $1
+       ORDER BY us.created_at DESC
+       LIMIT 5`,
+      [userId]
+    );
+
+    const lifestyleRes = await client.query(
+      `SELECT smoking, alcohol FROM health_profile
+       WHERE user_id = $1`,
+      [userId]
+    );
+
+    const facts = {
+      diagnoses: diagRes.rows.map(r => r.name),
+      symptoms: symptomsRes.rows,
+      lifestyle: lifestyleRes.rows[0] || {}
+    };
+
+    const result = await runTriage(facts);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 });
 
