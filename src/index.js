@@ -205,7 +205,17 @@ app.post("/triage/:userId", async (req, res) => {
       [userId]
     );
 
-    const rawLifestyle = lifestyleRes.rows[0] || {};
+  const rawLifestyle = lifestyleRes.rows[0] || {};
+
+const alcoholUnits = rawLifestyle.alcohol_units_per_week || 0;
+const alcoholFreq = rawLifestyle.alcohol_frequency || 'none';
+
+const alcoholLevel =
+  alcoholUnits >= 21 || alcoholFreq === 'daily'
+    ? 'high'
+    : alcoholUnits >= 7
+      ? 'moderate'
+      : 'low';
 
 const facts = {
   diagnoses: diagRes.rows.map(r => r.name),
@@ -215,6 +225,8 @@ const facts = {
     smoking_years: rawLifestyle.smoking_years || 0,
     cigarettes_per_day: rawLifestyle.cigarettes_per_day || 0,
     vape_frequency: rawLifestyle.vape_frequency || 'none',
+
+    alcohol: alcoholLevel,
     alcohol_frequency: rawLifestyle.alcohol_frequency || 'none',
     alcohol_units_per_week: rawLifestyle.alcohol_units_per_week || 0
   }
