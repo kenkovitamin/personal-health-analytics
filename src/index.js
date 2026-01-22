@@ -200,7 +200,7 @@ app.post("/triage/:userId", async (req, res) => {
     );
 
     const lifestyleRes = await client.query(
-      `SELECT smoking_status, smoking_years, cigarettes_per_day, vape_frequency, alcohol_frequency FROM health_profile
+      `SELECT smoking_status, smoking_years, cigarettes_per_day, vape_frequency, alcohol_frequency, alcohol_units_per_week FROM health_profile
        WHERE user_id = $1`,
       [userId]
     );
@@ -215,7 +215,8 @@ const facts = {
     smoking_years: rawLifestyle.smoking_years || 0,
     cigarettes_per_day: rawLifestyle.cigarettes_per_day || 0,
     vape_frequency: rawLifestyle.vape_frequency || 'none',
-    alcohol: rawLifestyle.alcohol_frequency || 'none'
+    alcohol_frequency: rawLifestyle.alcohol_frequency || 'none',
+    alcohol_units_per_week: rawLifestyle.alcohol_units_per_week || 0
   }
 };
 
