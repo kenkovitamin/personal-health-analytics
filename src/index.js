@@ -200,7 +200,7 @@ app.post("/triage/:userId", async (req, res) => {
     );
 
     const lifestyleRes = await client.query(
-      `SELECT smoking_status, smoking_years, cigarettes_per_day, vape_frequency FROM health_profile
+      `SELECT smoking_status, smoking_years, cigarettes_per_day, vape_frequency, alcohol_level FROM health_profile
        WHERE user_id = $1`,
       [userId]
     );
