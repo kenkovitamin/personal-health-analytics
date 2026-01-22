@@ -19,18 +19,18 @@
       }
     },
     {
-      "id": "HR_002",
-      "level": "HIGH_RISK",
-      "conditions": {
-        "diagnoses": ["peptic_ulcer"],
-        "lifestyle": {
-          "alcohol": "high",
-          "smoking": true
-        },
-        "symptoms": {
-          "vomiting": true
-        }
-      }
+  "id": "HR_002",
+  "level": "HIGH_RISK",
+  "conditions": {
+    "diagnoses": ["peptic_ulcer"],
+    "lifestyle": {
+      "alcohol": "high",
+      "smoking": true
+    },
+    "symptoms": {
+      "vomiting": true
     }
+  }
+}
   ]
 }
