@@ -215,6 +215,7 @@ const facts = {
     smoking_years: rawLifestyle.smoking_years || 0,
     cigarettes_per_day: rawLifestyle.cigarettes_per_day || 0,
     vape_frequency: rawLifestyle.vape_frequency || 'none'
+    alcohol: rawLifestyle.alcohol_level || 'none'
   }
 };
 
