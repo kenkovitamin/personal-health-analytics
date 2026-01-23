@@ -16,12 +16,15 @@ export async function runTriage(userFacts) {
 
     // diagnoses check
     if (rule.conditions.diagnoses) {
-      for (const d of rule.conditions.diagnoses) {
-        if (!diagnoses.includes(d)) {
-          match = false;
-        }
-      }
+  for (const d of rule.conditions.diagnoses) {
+    const found = diagnoses.some(
+      dx => dx.toLowerCase() === d.toLowerCase()
+    );
+    if (!found) {
+      match = false;
     }
+  }
+}
 
     // lifestyle check
     if (rule.conditions.lifestyle) {
