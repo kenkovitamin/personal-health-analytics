@@ -6,6 +6,8 @@ const rulesData = JSON.parse(fs.readFileSync(rulesPath, "utf-8"));
 
 export async function runTriage(userFacts) {
   const { diagnoses, symptoms, lifestyle } = userFacts;
+  
+    console.log("TRIAGE FACTS", JSON.stringify(userFacts, null, 2));
 
   let matchedRules = [];
 
