@@ -32,5 +32,16 @@
     }
   }
 }
+    {
+  "id": "SYS_003",
+  "level": "MODERATE",
+  "conditions": {
+    "diagnoses": ["psoriasis"],
+    "symptoms": {
+      "nail_ridges": true,
+      "nail_deformation": true
+    }
+  }
+}
   ]
 }
