@@ -7,40 +7,41 @@
   ],
 
   "rules": [
-  {
-    "id": "EMR_001",
-    "level": "EMERGENCY",
-    "conditions": {
-      "diagnoses": ["diverticulitis"],
-      "symptoms": {
-        "pain_severity_gte": 8,
-        "fever": true
+    {
+      "id": "EMR_001",
+      "level": "EMERGENCY",
+      "conditions": {
+        "diagnoses": ["diverticulitis"],
+        "symptoms": {
+          "pain_severity_gte": 8,
+          "fever": true
+        }
+      }
+    },
+    {
+      "id": "HR_002",
+      "level": "HIGH_RISK",
+      "conditions": {
+        "diagnoses": ["peptic_ulcer"],
+        "lifestyle": {
+          "alcohol": "high",
+          "smoking": true
+        },
+        "symptoms": {
+          "vomiting": true
+        }
+      }
+    },
+    {
+      "id": "SYS_003",
+      "level": "MODERATE",
+      "conditions": {
+        "diagnoses": ["psoriasis"],
+        "symptoms": {
+          "nail_ridges": true,
+          "nail_deformation": true
+        }
       }
     }
-  },
-  {
-    "id": "HR_002",
-    "level": "HIGH_RISK",
-    "conditions": {
-      "diagnoses": ["peptic_ulcer"],
-      "lifestyle": {
-        "alcohol": "high",
-        "smoking": true
-      },
-      "symptoms": {
-        "vomiting": true
-      }
-    }
-  },
-  {
-    "id": "SYS_003",
-    "level": "MODERATE",
-    "conditions": {
-      "diagnoses": ["psoriasis"],
-      "symptoms": {
-        "nail_ridges": true,
-        "nail_deformation": true
-      }
-    }
-  }
-]
+  ]
+}
