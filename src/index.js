@@ -200,12 +200,46 @@ app.post("/triage/:userId", async (req, res) => {
     );
 
     const lifestyleRes = await client.query(
-      `SELECT smoking_status, smoking_years, cigarettes_per_day, vape_frequency, alcohol_frequency, alcohol_units_per_week FROM health_profile
-       WHERE user_id = $1`,
-      [userId]
-    );
+  `SELECT
+     birth_date,
+     height_cm,
+     weight_kg,
+     smoking_status,
+     smoking_years,
+     cigarettes_per_day,
+     vape_frequency,
+     alcohol_frequency,
+     alcohol_units_per_week
+   FROM health_profile
+   WHERE user_id = $1`,
+  [userId]
+);
 
-  const rawLifestyle = lifestyleRes.rows[0] || {};
+  const rawLifestyle = lifestyleRes.rows[0];
+
+if (!rawLifestyle) {
+  return res.status(400).json({
+    error: "HEALTH_PROFILE_MISSING",
+    message: "Health profile not found. Complete onboarding first."
+  });
+}
+
+const requiredProfileFields = [
+  "birth_date",
+  "height_cm",
+  "weight_kg",
+  "smoking_status",
+  "alcohol_frequency"
+];
+
+for (const field of requiredProfileFields) {
+  if (rawLifestyle[field] === null || rawLifestyle[field] === undefined) {
+    return res.status(400).json({
+      error: "HEALTH_PROFILE_INCOMPLETE",
+      message: `Missing required field: ${field}`
+    });
+  }
+}
 
 const alcoholUnits = rawLifestyle.alcohol_units_per_week || 0;
 const alcoholFreq = rawLifestyle.alcohol_frequency || 'none';
