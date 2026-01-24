@@ -215,6 +215,22 @@ app.post("/triage/:userId", async (req, res) => {
   [userId]
 );
 
+    const medsRes = await client.query(
+  `SELECT m.name
+   FROM user_medications um
+   JOIN medications m ON um.medication_id = m.id
+   WHERE um.user_id = $1`,
+  [userId]
+);
+
+const suppRes = await client.query(
+  `SELECT s.name
+   FROM user_supplements us
+   JOIN supplements s ON us.supplement_id = s.id
+   WHERE us.user_id = $1`,
+  [userId]
+);
+
   const rawLifestyle = lifestyleRes.rows[0];
 
 if (!rawLifestyle) {
