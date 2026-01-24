@@ -270,6 +270,10 @@ const alcoholLevel =
 const facts = {
   diagnoses: diagRes.rows.map(r => r.name),
   symptoms: symptomsRes.rows,
+
+  medications: medsRes.rows.map(r => r.name),
+  supplements: suppRes.rows.map(r => r.name),
+
   lifestyle: {
     smoking: rawLifestyle.smoking_status === 'current',
     smoking_years: rawLifestyle.smoking_years || 0,
@@ -279,8 +283,13 @@ const facts = {
     alcohol: alcoholLevel,
     alcohol_frequency: rawLifestyle.alcohol_frequency || 'none',
     alcohol_units_per_week: rawLifestyle.alcohol_units_per_week || 0
+  },
+
+  bmi,
+  markers: {}
   }
 };
+
 
     const result = await runTriage(facts);
     res.json(result);
