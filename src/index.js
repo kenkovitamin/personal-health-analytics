@@ -267,7 +267,7 @@ const alcoholLevel =
       ? 'moderate'
       : 'low';
 
-const facts = {
+  const facts = {
   diagnoses: diagRes.rows.map(r => r.name),
   symptoms: symptomsRes.rows,
 
@@ -287,9 +287,7 @@ const facts = {
 
   bmi,
   markers: {}
-  }
 };
-
 
     const result = await runTriage(facts);
     res.json(result);
