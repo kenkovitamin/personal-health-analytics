@@ -4,6 +4,7 @@ import pg from "pg";
 import bodyParser from "body-parser";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { runRecommendations } from "./services/recommendationService.js";
 
 const app = express();
 app.use(bodyParser.json());
@@ -291,6 +292,137 @@ const alcoholLevel =
 
     const result = await runTriage(facts);
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+import { runRecommendations } from "./services/recommendationService.js";
+
+app.get("/recommendations/:userId", async (req, res) => {
+  const userId = req.params.userId;
+  const client = await pool.connect();
+
+  try {
+    // diagnoses
+    const diagRes = await client.query(
+      `SELECT c.name FROM user_conditions uc
+       JOIN conditions c ON uc.condition_id = c.id
+       WHERE uc.user_id = $1`,
+      [userId]
+    );
+
+    // symptoms
+    const symptomsRes = await client.query(
+      `SELECT s.name, us.severity
+       FROM user_symptoms us
+       JOIN symptoms s ON us.symptom_id = s.id
+       WHERE us.user_id = $1
+       ORDER BY us.created_at DESC
+       LIMIT 5`,
+      [userId]
+    );
+
+    // lifestyle
+    const lifestyleRes = await client.query(
+      `SELECT birth_date, height_cm, weight_kg,
+              smoking_status, smoking_years, cigarettes_per_day, vape_frequency,
+              alcohol_frequency, alcohol_units_per_week
+       FROM health_profile
+       WHERE user_id = $1`,
+      [userId]
+    );
+
+    const rawLifestyle = lifestyleRes.rows[0];
+
+    if (!rawLifestyle) {
+      return res.status(400).json({
+        error: "HEALTH_PROFILE_MISSING",
+        message: "Health profile not found. Complete onboarding first."
+      });
+    }
+
+    const requiredProfileFields = [
+      "birth_date",
+      "height_cm",
+      "weight_kg",
+      "smoking_status",
+      "alcohol_frequency"
+    ];
+
+    for (const field of requiredProfileFields) {
+      if (rawLifestyle[field] === null || rawLifestyle[field] === undefined) {
+        return res.status(400).json({
+          error: "HEALTH_PROFILE_INCOMPLETE",
+          message: `Missing required field: ${field}`
+        });
+      }
+    }
+
+    const alcoholUnits = rawLifestyle.alcohol_units_per_week || 0;
+    const alcoholFreq = rawLifestyle.alcohol_frequency || "none";
+
+    const alcoholLevel =
+      alcoholUnits >= 21 || alcoholFreq === "daily"
+        ? "high"
+        : alcoholUnits >= 7
+          ? "moderate"
+          : "low";
+
+    const heightM = rawLifestyle.height_cm / 100;
+    const bmi =
+      heightM && rawLifestyle.weight_kg
+        ? rawLifestyle.weight_kg / (heightM * heightM)
+        : null;
+
+    // meds
+    const medsRes = await client.query(
+      `SELECT m.name
+       FROM user_medications um
+       JOIN medications m ON um.medication_id = m.id
+       WHERE um.user_id = $1`,
+      [userId]
+    );
+
+    // supplements (BАDы)
+    const suppRes = await client.query(
+      `SELECT n.name
+       FROM user_nutrients un
+       JOIN nutrients n ON un.nutrient_id = n.id
+       WHERE un.user_id = $1`,
+      [userId]
+    );
+
+    const facts = {
+      diagnoses: diagRes.rows.map(r => r.name),
+      symptoms: symptomsRes.rows,
+      lifestyle: {
+        smoking: rawLifestyle.smoking_status === "current",
+        smoking_years: rawLifestyle.smoking_years || 0,
+        cigarettes_per_day: rawLifestyle.cigarettes_per_day || 0,
+        vape_frequency: rawLifestyle.vape_frequency || "none",
+
+        alcohol: alcoholLevel,
+        alcohol_frequency: rawLifestyle.alcohol_frequency || "none",
+        alcohol_units_per_week: rawLifestyle.alcohol_units_per_week || 0
+      },
+      bmi,
+      medications: medsRes.rows.map(r => r.name),
+      supplements: suppRes.rows.map(r => r.name)
+    };
+
+    // triage reuse
+    const triageResult = await runTriage(facts);
+
+    const recommendations = runRecommendations(facts, triageResult);
+
+    res.json({
+      triage: triageResult,
+      recommendations
+    });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
