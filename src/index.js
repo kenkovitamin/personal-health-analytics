@@ -299,8 +299,6 @@ const alcoholLevel =
   }
 });
 
-import { runRecommendations } from "./services/recommendationService.js";
-
 app.get("/recommendations/:userId", async (req, res) => {
   const userId = req.params.userId;
   const client = await pool.connect();
