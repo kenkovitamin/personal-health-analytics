@@ -12,23 +12,17 @@ export function runRecommendations(userFacts, triageResult) {
     }
   };
 
-  // ---------- Base by triage ----------
   if (triage_level === "EMERGENCY") {
-    output.risk_summary.push("ACUTE_RISK");
-
-    output.recommendations.monitoring.push(
-      "Immediate medical evaluation required"
-    );
-
-    output.recommendations.lifestyle.push(
-      "Stop alcohol immediately",
-      "Stop smoking immediately"
-    );
-
-    output.recommendations.nutrition.push(
-      "Clear fluids only until assessed"
-    );
-  }
+  return {
+    risk_summary: ["ACUTE_RISK"],
+    recommendations: {
+      nutrition: ["Clear fluids only until assessed"],
+      supplements: [],
+      lifestyle: [],
+      monitoring: ["Immediate medical evaluation required"]
+    }
+  };
+}
 
   if (triage_level === "HIGH_RISK") {
     output.risk_summary.push("ELEVATED_RISK");
