@@ -304,15 +304,20 @@ app.get("/recommendations/:userId", async (req, res) => {
   const client = await pool.connect();
 
   try {
-    // diagnoses
+    // ======================
+    // DIAGNOSES
+    // ======================
     const diagRes = await client.query(
-      `SELECT c.name FROM user_conditions uc
+      `SELECT c.name
+       FROM user_conditions uc
        JOIN conditions c ON uc.condition_id = c.id
        WHERE uc.user_id = $1`,
       [userId]
     );
 
-    // symptoms
+    // ======================
+    // SYMPTOMS
+    // ======================
     const symptomsRes = await client.query(
       `SELECT s.name, us.severity
        FROM user_symptoms us
@@ -323,7 +328,9 @@ app.get("/recommendations/:userId", async (req, res) => {
       [userId]
     );
 
-    // lifestyle
+    // ======================
+    // HEALTH PROFILE (GATING)
+    // ======================
     const lifestyleRes = await client.query(
       `SELECT birth_date, height_cm, weight_kg,
               smoking_status, smoking_years, cigarettes_per_day, vape_frequency,
@@ -359,6 +366,9 @@ app.get("/recommendations/:userId", async (req, res) => {
       }
     }
 
+    // ======================
+    // ALCOHOL LEVEL
+    // ======================
     const alcoholUnits = rawLifestyle.alcohol_units_per_week || 0;
     const alcoholFreq = rawLifestyle.alcohol_frequency || "none";
 
@@ -369,13 +379,18 @@ app.get("/recommendations/:userId", async (req, res) => {
           ? "moderate"
           : "low";
 
+    // ======================
+    // BMI
+    // ======================
     const heightM = rawLifestyle.height_cm / 100;
     const bmi =
       heightM && rawLifestyle.weight_kg
         ? rawLifestyle.weight_kg / (heightM * heightM)
         : null;
 
-    // meds
+    // ======================
+    // MEDICATIONS
+    // ======================
     const medsRes = await client.query(
       `SELECT m.name
        FROM user_medications um
@@ -384,18 +399,24 @@ app.get("/recommendations/:userId", async (req, res) => {
       [userId]
     );
 
-    // supplements (BАDы)
-    const suppRes = await client.query(
-      `SELECT n.name
+    // ======================
+    // NUTRIENTS (LAB / VALUES)
+    // ======================
+    const nutrientsRes = await client.query(
+      `SELECT n.code, un.value, un.source
        FROM user_nutrients un
        JOIN nutrients n ON un.nutrient_id = n.id
        WHERE un.user_id = $1`,
       [userId]
     );
 
+    // ======================
+    // FACTS OBJECT
+    // ======================
     const facts = {
       diagnoses: diagRes.rows.map(r => r.name),
       symptoms: symptomsRes.rows,
+
       lifestyle: {
         smoking: rawLifestyle.smoking_status === "current",
         smoking_years: rawLifestyle.smoking_years || 0,
@@ -406,14 +427,22 @@ app.get("/recommendations/:userId", async (req, res) => {
         alcohol_frequency: rawLifestyle.alcohol_frequency || "none",
         alcohol_units_per_week: rawLifestyle.alcohol_units_per_week || 0
       },
+
       bmi,
+
       medications: medsRes.rows.map(r => r.name),
-      supplements: suppRes.rows.map(r => r.name)
+
+      nutrients: nutrientsRes.rows
     };
 
-    // triage reuse
+    // ======================
+    // TRIAGE
+    // ======================
     const triageResult = await runTriage(facts);
 
+    // ======================
+    // RECOMMENDATIONS
+    // ======================
     const recommendations = runRecommendations(facts, triageResult);
 
     res.json({
