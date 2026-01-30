@@ -467,7 +467,7 @@ const dietProfile = rawDiet
 
       nutrients: nutrientsRes.rows
 
-      diet: dietProfile
+      diet: dietProfile,
     };
 
     // ======================
