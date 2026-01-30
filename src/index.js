@@ -465,7 +465,7 @@ const dietProfile = rawDiet
 
       medications: medsRes.rows.map(r => r.name),
 
-      nutrients: nutrientsRes.rows
+      nutrients: nutrientsRes.rows,
 
       diet: dietProfile,
     };
