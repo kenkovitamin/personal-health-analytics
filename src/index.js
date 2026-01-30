@@ -411,6 +411,39 @@ app.get("/recommendations/:userId", async (req, res) => {
     );
 
     // ======================
+// DIET PROFILE
+// ======================
+const dietRes = await client.query(
+  `SELECT
+     diet_type,
+     meals_per_day,
+     protein_intake_level,
+     fiber_intake_level,
+     ultra_processed_food_frequency,
+     sugar_intake_level,
+     vegetables_frequency,
+     fruits_frequency
+   FROM user_diet_profile
+   WHERE user_id = $1`,
+  [userId]
+);
+
+const rawDiet = dietRes.rows[0];
+
+const dietProfile = rawDiet
+  ? {
+      diet_type: rawDiet.diet_type,
+      meals_per_day: rawDiet.meals_per_day,
+      protein_level: rawDiet.protein_intake_level,
+      fiber_level: rawDiet.fiber_intake_level,
+      ultra_processed_food: rawDiet.ultra_processed_food_frequency,
+      sugar_level: rawDiet.sugar_intake_level,
+      vegetables_frequency: rawDiet.vegetables_frequency,
+      fruits_frequency: rawDiet.fruits_frequency
+    }
+  : null;
+
+    // ======================
     // FACTS OBJECT
     // ======================
     const facts = {
@@ -433,6 +466,8 @@ app.get("/recommendations/:userId", async (req, res) => {
       medications: medsRes.rows.map(r => r.name),
 
       nutrients: nutrientsRes.rows
+
+      diet: dietProfile
     };
 
     // ======================
