@@ -5,6 +5,7 @@ import bodyParser from "body-parser";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { runRecommendations } from "./services/recommendationService.js";
+import { runDietSignals } from "./services/dietSignalEngine.js";
 
 const app = express();
 app.use(bodyParser.json());
