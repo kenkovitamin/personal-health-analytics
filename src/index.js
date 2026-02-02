@@ -476,10 +476,15 @@ const dietProfile = rawDiet
     // ======================
     const triageResult = await runTriage(facts);
 
+     // ======================
+    // DIET SIGNALS
+    // ======================
+  const dietSignals = runDietSignals(facts.diet, facts);
+  
     // ======================
     // RECOMMENDATIONS
     // ======================
-    const recommendations = runRecommendations(facts, triageResult);
+    const recommendations = runRecommendations( facts, triageResult, dietSignals);
 
     res.json({
       triage: triageResult,
