@@ -1,5 +1,6 @@
+import { runDietSignals } from "./dietSignalEngine.js";
 export function runRecommendations(userFacts, triageResult) {
-  const { diagnoses, lifestyle, bmi, medications, supplements } = userFacts;
+  const { diagnoses, lifestyle, bmi, medications, supplements, diet } = userFacts;
   const { triage_level } = triageResult;
 
   const output = {
@@ -84,6 +85,19 @@ export function runRecommendations(userFacts, triageResult) {
       "Annual check-up"
     );
   }
+
+  // ---------- Diet signals ----------
+let dietSignals = [];
+
+if (diet) {
+  dietSignals = runDietSignals(diet);
+
+  dietSignals.forEach(signal => {
+    if (!output.risk_summary.includes(signal)) {
+      output.risk_summary.push(signal);
+    }
+  });
+}
 
   // ---------- Diagnosis overlays ----------
   if (diagnoses.includes("psoriasis")) {
