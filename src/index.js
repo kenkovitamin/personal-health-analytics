@@ -410,20 +410,20 @@ app.get("/recommendations/:userId", async (req, res) => {
        WHERE un.user_id = $1`,
       [userId]
     );
-
-    // ======================
+    
+// ======================
 // DIET PROFILE
 // ======================
 const dietRes = await client.query(
   `SELECT
      diet_type,
      meals_per_day,
-     protein_intake_level,
-     fiber_intake_level,
-     ultra_processed_food_frequency,
-     sugar_intake_level,
-     vegetables_frequency,
-     fruits_frequency
+     protein_frequency,
+     fiber_intake,
+     ultra_processed_food,
+     sugar_intake,
+     fruit_veg_frequency,
+     water_intake_liters
    FROM user_diet_profile
    WHERE user_id = $1`,
   [userId]
@@ -435,12 +435,12 @@ const dietProfile = rawDiet
   ? {
       diet_type: rawDiet.diet_type,
       meals_per_day: rawDiet.meals_per_day,
-      protein_level: rawDiet.protein_intake_level,
-      fiber_level: rawDiet.fiber_intake_level,
-      ultra_processed_food: rawDiet.ultra_processed_food_frequency,
-      sugar_level: rawDiet.sugar_intake_level,
-      vegetables_frequency: rawDiet.vegetables_frequency,
-      fruits_frequency: rawDiet.fruits_frequency
+      protein_frequency: rawDiet.protein_frequency,
+      fiber_intake: rawDiet.fiber_intake,
+      ultra_processed_food: rawDiet.ultra_processed_food,
+      sugar_intake: rawDiet.sugar_intake,
+      fruit_veg_frequency: rawDiet.fruit_veg_frequency,
+      water_intake_liters: rawDiet.water_intake_liters
     }
   : null;
 
