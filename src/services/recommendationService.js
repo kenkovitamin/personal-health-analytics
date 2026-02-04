@@ -1,6 +1,15 @@
 import { runDietSignals } from "./dietSignalEngine.js";
-export function runRecommendations(userFacts, triageResult) {
-  const { diagnoses, lifestyle, bmi, medications, supplements, diet } = userFacts;
+
+export function runRecommendations(userFacts = {}, triageResult = {}) {
+  const {
+    diagnoses = [],
+    lifestyle = {},
+    bmi = null,
+    medications = [],
+    supplements = [],
+    diet = null
+  } = userFacts;
+
   const { triage_level } = triageResult;
 
   const output = {
