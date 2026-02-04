@@ -3,7 +3,6 @@ import pg from "pg";
 import bodyParser from "body-parser";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
-
 import { runTriage } from "./services/triageService.js";
 import { runRecommendations } from "./services/recommendationService.js";
 import { runDietSignals } from "./services/dietSignalEngine.js";
@@ -230,7 +229,6 @@ app.get("/recommendations/:userId", async (req, res) => {
     };
 
     const triage = await runTriage(facts);
-    const dietSignals = runDietSignals(facts.diet, facts);
     const recommendations = runRecommendations(facts, triage, dietSignals);
 
     res.json({ triage, recommendations });
