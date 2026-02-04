@@ -2,13 +2,13 @@ import { runDietSignals } from "./dietSignalEngine.js";
 
 export function runRecommendations(userFacts = {}, triageResult = {}) {
   const {
-    diagnoses = [],
-    lifestyle = {},
-    bmi = null,
-    medications = [],
-    supplements = [],
-    diet = null
-  } = userFacts;
+  diagnoses = [],
+  lifestyle = {},
+  bmi = null,
+  medications = [],
+  supplements = [],
+  diet = null
+} = userFacts || {};
 
   const { triage_level } = triageResult;
 
