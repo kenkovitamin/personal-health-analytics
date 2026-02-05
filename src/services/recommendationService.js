@@ -1,6 +1,11 @@
 import { runDietSignals } from "./dietSignalEngine.js";
 
-export function runRecommendations(userFacts = {}, triageResult = {}) {
+export function runRecommendations(userFacts, triageResult) {
+  console.log("RUN RECOMMENDATIONS userFacts", JSON.stringify(userFacts, null, 2));
+  if (!userFacts || !Array.isArray(userFacts.diagnoses)) {
+    throw new Error("userFacts.diagnoses is missing or invalid");
+  }
+
   const {
     diagnoses = [],
     lifestyle = {},
