@@ -109,7 +109,8 @@ if (diet) {
 }
 
   // ---------- Diagnosis overlays ----------
-  if (diagnoses.includes("psoriasis")) {
+ if (Array.isArray(diagnoses) && diagnoses.includes("psoriasis")) {
+   
     output.risk_summary.push(
       "AUTOIMMUNE_BACKGROUND",
       "CHRONIC_INFLAMMATION"
@@ -125,7 +126,7 @@ if (diet) {
     );
   }
 
-  if (diagnoses.includes("peptic_ulcer")) {
+  if (Array.isArray(diagnoses) && diagnoses.includes("peptic_ulcer")) {
     output.risk_summary.push(
       "GASTRIC_MUCOSA_DAMAGE"
     );
@@ -137,7 +138,7 @@ if (diet) {
     );
   }
 
-  if (diagnoses.includes("diverticulitis")) {
+  if (Array.isArray(diagnoses) && diagnoses.includes("diverticulitis")) {
     output.risk_summary.push(
       "COLON_INFLAMMATION_RISK"
     );
