@@ -229,7 +229,7 @@ app.get("/recommendations/:userId", async (req, res) => {
     };
 
     const triage = await runTriage(facts);
-    const recommendations = runRecommendations(facts, triage, dietSignals);
+    const recommendations = runRecommendations(facts, triage);
 
     res.json({ triage, recommendations });
 
