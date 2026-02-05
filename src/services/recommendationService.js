@@ -12,8 +12,6 @@ export function runRecommendations(userFacts = {}, triageResult = {}) {
 
   const { triage_level = "LOW" } = triageResult;
 
-  const { triage_level } = triageResult;
-
   const output = {
     risk_summary: [],
     recommendations: {
