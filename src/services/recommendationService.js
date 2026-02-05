@@ -1,11 +1,12 @@
 import { runDietSignals } from "./dietSignalEngine.js";
 
 export function runRecommendations(userFacts, triageResult) {
-  console.log("RUN RECOMMENDATIONS userFacts", JSON.stringify(userFacts, null, 2));
-  if (!userFacts || !Array.isArray(userFacts.diagnoses)) {
-    throw new Error("userFacts.diagnoses is missing or invalid");
-  }
+  console.log(
+    "RUN RECOMMENDATIONS INPUT",
+    JSON.stringify({ userFacts, triageResult }, null, 2)
+  );
 
+  // ---------- SAFE DEFAULTS ----------
   const {
     diagnoses = [],
     lifestyle = {},
@@ -13,9 +14,9 @@ export function runRecommendations(userFacts, triageResult) {
     medications = [],
     supplements = [],
     diet = null
-  } = userFacts;
+  } = userFacts || {};
 
-  const { triage_level = "LOW" } = triageResult;
+  const { triage_level = "LOW" } = triageResult || {};
 
   const output = {
     risk_summary: [],
@@ -27,17 +28,18 @@ export function runRecommendations(userFacts, triageResult) {
     }
   };
 
+  // ---------- TRIAGE CORE ----------
   if (triage_level === "EMERGENCY") {
-  return {
-    risk_summary: ["ACUTE_RISK"],
-    recommendations: {
-      nutrition: ["Clear fluids only until assessed"],
-      supplements: [],
-      lifestyle: [],
-      monitoring: ["Immediate medical evaluation required"]
-    }
-  };
-}
+    return {
+      risk_summary: ["ACUTE_RISK"],
+      recommendations: {
+        nutrition: ["Clear fluids only until assessed"],
+        supplements: [],
+        lifestyle: [],
+        monitoring: ["Immediate medical evaluation required"]
+      }
+    };
+  }
 
   if (triage_level === "HIGH_RISK") {
     output.risk_summary.push("ELEVATED_RISK");
@@ -100,30 +102,28 @@ export function runRecommendations(userFacts, triageResult) {
     );
   }
 
-  // ---------- Diet signals ----------
-let dietSignals = [];
-
-if (diet) {
-  dietSignals = runDietSignals(diet);
-
-  dietSignals.forEach(signal => {
-    if (!output.risk_summary.includes(signal)) {
-      output.risk_summary.push(signal);
+  // ---------- DIET SIGNALS (OPTIONAL) ----------
+  if (diet) {
+    try {
+      const dietSignals = runDietSignals(diet);
+      dietSignals.forEach(signal => {
+        if (!output.risk_summary.includes(signal)) {
+          output.risk_summary.push(signal);
+        }
+      });
+    } catch (e) {
+      console.warn("Diet signals skipped:", e.message);
     }
-  });
-}
+  }
 
-  // ---------- Diagnosis overlays ----------
- if (Array.isArray(diagnoses) && diagnoses.includes("psoriasis")) {
-   
+  // ---------- DIAGNOSIS OVERLAYS ----------
+  if (Array.isArray(diagnoses) && diagnoses.includes("psoriasis")) {
     output.risk_summary.push(
       "AUTOIMMUNE_BACKGROUND",
       "CHRONIC_INFLAMMATION"
     );
 
-    output.recommendations.supplements.push(
-      "Curcumin"
-    );
+    output.recommendations.supplements.push("Curcumin");
 
     output.recommendations.monitoring.push(
       "CRP, ESR",
@@ -132,9 +132,7 @@ if (diet) {
   }
 
   if (Array.isArray(diagnoses) && diagnoses.includes("peptic_ulcer")) {
-    output.risk_summary.push(
-      "GASTRIC_MUCOSA_DAMAGE"
-    );
+    output.risk_summary.push("GASTRIC_MUCOSA_DAMAGE");
 
     output.recommendations.nutrition.push(
       "Avoid spicy foods",
@@ -144,9 +142,7 @@ if (diet) {
   }
 
   if (Array.isArray(diagnoses) && diagnoses.includes("diverticulitis")) {
-    output.risk_summary.push(
-      "COLON_INFLAMMATION_RISK"
-    );
+    output.risk_summary.push("COLON_INFLAMMATION_RISK");
 
     output.recommendations.nutrition.push(
       "Gradual fiber increase",
@@ -154,10 +150,9 @@ if (diet) {
     );
   }
 
-  // ---------- Lifestyle overlays ----------
+  // ---------- LIFESTYLE ----------
   if (lifestyle.smoking === true) {
     output.risk_summary.push("SMOKING_RISK");
-
     output.recommendations.lifestyle.push(
       "Structured smoking cessation plan"
     );
@@ -165,13 +160,12 @@ if (diet) {
 
   if (lifestyle.alcohol === "high") {
     output.risk_summary.push("ALCOHOL_RISK");
-
     output.recommendations.lifestyle.push(
       "Strict alcohol cessation"
     );
   }
 
-  // ---------- BMI overlays ----------
+  // ---------- BMI ----------
   if (bmi && bmi >= 25) {
     output.risk_summary.push("METABOLIC_RISK");
 
@@ -185,17 +179,15 @@ if (diet) {
     );
   }
 
-  // ---------- Medication awareness ----------
-  if (medications && medications.length > 0) {
+  // ---------- MEDS / SUPPLEMENTS ----------
+  if (medications.length > 0) {
     output.risk_summary.push("ACTIVE_MEDICATION_USE");
-
     output.recommendations.monitoring.push(
       "Review medication–nutrient interactions"
     );
   }
 
-  // ---------- Supplement awareness ----------
-  if (supplements && supplements.length > 0) {
+  if (supplements.length > 0) {
     output.recommendations.monitoring.push(
       "Review supplement interactions and dosing"
     );
