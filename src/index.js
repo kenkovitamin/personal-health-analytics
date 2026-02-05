@@ -229,6 +229,7 @@ app.get("/recommendations/:userId", async (req, res) => {
     };
 
     const triage = await runTriage(facts);
+    console.log("RECOMMENDATION INPUT", JSON.stringify(facts, null, 2));
     const recommendations = runRecommendations(facts, triage);
 
     res.json({ triage, recommendations });
