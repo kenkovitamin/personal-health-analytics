@@ -253,6 +253,17 @@ const healthScore = calculateHealthRiskIndex({
   bmi: facts.bmi,
   nutrients: facts.nutrients
 });
+    const prevScoreRes = await client.query(
+  `SELECT score, breakdown
+   FROM user_health_score_history
+   WHERE user_id = $1
+   ORDER BY created_at DESC
+   LIMIT 1`,
+  [userId]
+);
+
+const previousScore = prevScoreRes.rows[0] || null;
+
     await client.query(
   `INSERT INTO user_health_score_history
    (user_id, score, label, breakdown, triage_level)
