@@ -253,6 +253,18 @@ const healthScore = calculateHealthRiskIndex({
   bmi: facts.bmi,
   nutrients: facts.nutrients
 });
+    await client.query(
+  `INSERT INTO user_health_score_history
+   (user_id, score, label, breakdown, triage_level)
+   VALUES ($1,$2,$3,$4,$5)`,
+  [
+    userId,
+    healthScore.score,
+    healthScore.label,
+    healthScore.breakdown,
+    triage.triage_level
+  ]
+);
 
 // ======================
 // PERSIST DIET ANALYSIS (OPTIONAL)
