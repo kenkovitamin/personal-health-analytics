@@ -227,16 +227,47 @@ app.get("/recommendations/:userId", async (req, res) => {
       },
       diet: dietRes.rows[0] || null
     };
+    
+// ======================
+// TRIAGE
+// ======================
+const triage = await runTriage(facts);
 
-    const triage = await runTriage(facts);
-    console.log("RECOMMENDATION INPUT", JSON.stringify(facts, null, 2));
-    const recommendations = runRecommendations(facts, triage);
+// ======================
+// RECOMMENDATIONS
+// ======================
+console.log(
+  "RECOMMENDATION INPUT",
+  JSON.stringify(facts, null, 2)
+);
 
-    if (recommendations.diet_analysis) {
+const recommendations = runRecommendations(facts, triage);
+
+// ======================
+// SCORE (PURE CALCULATION)
+// ======================
+const healthScore = calculateHealthRiskIndex({
+  triage,
+  dietSignals: recommendations.diet_analysis || null,
+  lifestyle: facts.lifestyle,
+  bmi: facts.bmi,
+  nutrients: facts.nutrients
+});
+
+// ======================
+// PERSIST DIET ANALYSIS (OPTIONAL)
+// ======================
+if (recommendations.diet_analysis) {
   await client.query(
     `INSERT INTO user_diet_analysis
      (user_id, diet_risks, diet_warnings, diet_gaps, confidence)
-     VALUES ($1,$2,$3,$4,$5)`,
+     VALUES ($1,$2,$3,$4,$5)
+     ON CONFLICT (user_id) DO UPDATE SET
+       diet_risks = EXCLUDED.diet_risks,
+       diet_warnings = EXCLUDED.diet_warnings,
+       diet_gaps = EXCLUDED.diet_gaps,
+       confidence = EXCLUDED.confidence,
+       updated_at = NOW()`,
     [
       userId,
       recommendations.diet_analysis.diet_risks,
@@ -247,7 +278,15 @@ app.get("/recommendations/:userId", async (req, res) => {
   );
 }
 
-    res.json({ triage, recommendations });
+// ======================
+// RESPONSE
+// ======================
+res.json({
+  triage,
+  score: healthScore.score,
+  score_breakdown: healthScore.breakdown,
+  recommendations
+});
 
   } catch (e) {
     res.status(500).json({ error: e.message });
