@@ -102,19 +102,34 @@ export function runRecommendations(userFacts, triageResult) {
     );
   }
 
-  // ---------- DIET SIGNALS (OPTIONAL) ----------
-  if (diet) {
-    try {
-      const dietSignals = runDietSignals(diet);
-      dietSignals.forEach(signal => {
-        if (!output.risk_summary.includes(signal)) {
-          output.risk_summary.push(signal);
-        }
-      });
-    } catch (e) {
-      console.warn("Diet signals skipped:", e.message);
-    }
+ // ---------- Diet signals ----------
+if (diet) {
+  const dietSignals = runDietSignals(diet, { diagnoses });
+
+  if (dietSignals?.diet_risks?.length) {
+    dietSignals.diet_risks.forEach(signal => {
+      if (!output.risk_summary.includes(signal)) {
+        output.risk_summary.push(signal);
+      }
+    });
   }
+
+  if (dietSignals?.diet_warnings?.length) {
+    dietSignals.diet_warnings.forEach(signal => {
+      if (!output.risk_summary.includes(signal)) {
+        output.risk_summary.push(signal);
+      }
+    });
+  }
+
+  if (dietSignals?.diet_gaps?.length) {
+    dietSignals.diet_gaps.forEach(signal => {
+      if (!output.risk_summary.includes(signal)) {
+        output.risk_summary.push(signal);
+      }
+    });
+  }
+}
 
   // ---------- DIAGNOSIS OVERLAYS ----------
   if (Array.isArray(diagnoses) && diagnoses.includes("psoriasis")) {
