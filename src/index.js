@@ -232,6 +232,21 @@ app.get("/recommendations/:userId", async (req, res) => {
     console.log("RECOMMENDATION INPUT", JSON.stringify(facts, null, 2));
     const recommendations = runRecommendations(facts, triage);
 
+    if (recommendations.diet_analysis) {
+  await client.query(
+    `INSERT INTO user_diet_analysis
+     (user_id, diet_risks, diet_warnings, diet_gaps, confidence)
+     VALUES ($1,$2,$3,$4,$5)`,
+    [
+      userId,
+      recommendations.diet_analysis.diet_risks,
+      recommendations.diet_analysis.diet_warnings,
+      recommendations.diet_analysis.diet_gaps,
+      recommendations.diet_analysis.confidence
+    ]
+  );
+}
+
     res.json({ triage, recommendations });
 
   } catch (e) {
