@@ -8,6 +8,7 @@ import { runRecommendations } from "./services/recommendationService.js";
 import { runDietSignals } from "./services/dietSignalEngine.js";
 import { calculateHealthRiskIndex } from "./services/healthScoreService.js";
 import { calculateHealthDelta } from "./services/healthDeltaService.js";
+import { generateHealthExplanation } from "./services/healthExplainService.js";
 
 const app = express();
 app.use(bodyParser.json());
