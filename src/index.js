@@ -281,6 +281,13 @@ const delta = calculateHealthDelta(previousScore, healthScore);
     triage.triage_level
   ]
 );
+    
+const explanation = generateHealthExplanation({
+  healthScore,
+  delta,
+  triage,
+  recommendations
+});
 
 // ======================
 // PERSIST DIET ANALYSIS (OPTIONAL)
@@ -313,6 +320,7 @@ res.json({
   triage,
   health_score: healthScore,
   delta,
+  explanation,
   recommendations
 });
 
