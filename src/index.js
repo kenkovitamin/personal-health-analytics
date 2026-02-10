@@ -6,6 +6,7 @@ import bcrypt from "bcrypt";
 import { runTriage } from "./services/triageService.js";
 import { runRecommendations } from "./services/recommendationService.js";
 import { runDietSignals } from "./services/dietSignalEngine.js";
+import { calculateHealthRiskIndex } from "./services/healthScoreService.js";
 
 const app = express();
 app.use(bodyParser.json());
