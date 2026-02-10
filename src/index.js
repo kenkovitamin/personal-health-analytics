@@ -264,6 +264,8 @@ const healthScore = calculateHealthRiskIndex({
 
 const previousScore = prevScoreRes.rows[0] || null;
 
+const delta = calculateHealthDelta(previousScore, healthScore);
+
     await client.query(
   `INSERT INTO user_health_score_history
    (user_id, score, label, breakdown, triage_level)
@@ -306,8 +308,8 @@ if (recommendations.diet_analysis) {
 // ======================
 res.json({
   triage,
-  score: healthScore.score,
-  score_breakdown: healthScore.breakdown,
+  health_score: healthScore,
+  delta,
   recommendations
 });
 
