@@ -9,6 +9,8 @@ import { runDietSignals } from "./services/dietSignalEngine.js";
 import { calculateHealthRiskIndex } from "./services/healthScoreService.js";
 import { calculateHealthDelta } from "./services/healthDeltaService.js";
 import { generateHealthExplanation } from "./services/healthExplainService.js";
+import { generateHealthAlerts } from "./services/healthAlertService.js";
+import { projectHealthScore } from "./services/healthProjectionService.js";
 
 const app = express();
 app.use(bodyParser.json());
@@ -288,6 +290,17 @@ const explanation = generateHealthExplanation({
   triage,
   recommendations
 });
+  
+  const alerts = generateHealthAlerts({
+  healthScore,
+  delta,
+  triage
+});
+
+const projections = projectHealthScore({
+  healthScore,
+  recommendations
+});
 
 // ======================
 // PERSIST DIET ANALYSIS (OPTIONAL)
@@ -321,6 +334,8 @@ res.json({
   health_score: healthScore,
   delta,
   explanation,
+  alerts,
+  projections,
   recommendations
 });
 
