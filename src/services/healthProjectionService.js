@@ -1,16 +1,34 @@
 export function projectHealthScore({ healthScore, recommendations }) {
   const projections = [];
 
+  const addProjection = ({
+    action,
+    timeframe_days,
+    expected_score_change,
+    confidence
+  }) => {
+    projections.push({
+      action,
+      timeframe_days,
+      expected_score_change,
+      projected_score: Math.min(
+        100,
+        healthScore.score + expected_score_change
+      ),
+      confidence
+    });
+  };
+
   // Alcohol cessation
   if (
     recommendations?.recommendations?.lifestyle?.some(r =>
       r.toLowerCase().includes("alcohol")
     )
   ) {
-    projections.push({
+    addProjection({
       action: "ALCOHOL_CESSATION",
       timeframe_days: 30,
-      expected_score_change: +10,
+      expected_score_change: 10,
       confidence: "medium"
     });
   }
@@ -21,10 +39,10 @@ export function projectHealthScore({ healthScore, recommendations }) {
       r.toLowerCase().includes("smoking")
     )
   ) {
-    projections.push({
+    addProjection({
       action: "SMOKING_CESSATION",
       timeframe_days: 30,
-      expected_score_change: +8,
+      expected_score_change: 8,
       confidence: "medium"
     });
   }
@@ -35,10 +53,10 @@ export function projectHealthScore({ healthScore, recommendations }) {
       r.toLowerCase().includes("physical")
     )
   ) {
-    projections.push({
+    addProjection({
       action: "PHYSICAL_ACTIVITY",
       timeframe_days: 30,
-      expected_score_change: +5,
+      expected_score_change: 5,
       confidence: "low"
     });
   }
