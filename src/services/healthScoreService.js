@@ -1,9 +1,31 @@
+// ==============================
+// Health Score Engine (v2)
+// Progressive age-based model
+// ==============================
+
+function calculateAge(birthDate) {
+  if (!birthDate) return null;
+
+  const today = new Date();
+  const dob = new Date(birthDate);
+
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+    age--;
+  }
+
+  return age;
+}
+
 export function calculateHealthRiskIndex({
   triage,
   dietSignals,
   lifestyle,
   bmi,
-  nutrients
+  nutrients,
+  birth_date
 }) {
   let score = 100;
 
@@ -60,6 +82,24 @@ export function calculateHealthRiskIndex({
   }
 
   // ======================
+  // AGE (progressive risk)
+  // ======================
+  const age = calculateAge(birth_date);
+
+  if (typeof age === "number") {
+    if (age >= 65) breakdown.metabolic -= 28;
+    else if (age >= 60) breakdown.metabolic -= 22;
+    else if (age >= 55) breakdown.metabolic -= 17;
+    else if (age >= 50) breakdown.metabolic -= 13;
+    else if (age >= 45) breakdown.metabolic -= 10;
+    else if (age >= 40) breakdown.metabolic -= 7;
+    else if (age >= 35) breakdown.metabolic -= 5;
+    else if (age >= 30) breakdown.metabolic -= 3;
+    else if (age >= 25) breakdown.metabolic -= 2;
+    else if (age >= 20) breakdown.metabolic -= 1;
+  }
+
+  // ======================
   // NUTRIENTS (light weight)
   // ======================
   if (Array.isArray(nutrients)) {
@@ -79,19 +119,25 @@ export function calculateHealthRiskIndex({
     breakdown.metabolic +
     breakdown.nutrients;
 
+  // Clamp 0–100
   if (score < 0) score = 0;
   if (score > 100) score = 100;
+
+  // ======================
+  // LABEL
+  // ======================
+  const label =
+    score >= 80
+      ? "LOW_RISK"
+      : score >= 55
+      ? "MODERATE_RISK"
+      : score >= 35
+      ? "HIGH_RISK"
+      : "CRITICAL";
 
   return {
     score,
     breakdown,
-    label:
-      score >= 80
-        ? "LOW_RISK"
-        : score >= 55
-        ? "MODERATE_RISK"
-        : score >= 35
-        ? "HIGH_RISK"
-        : "CRITICAL"
+    label
   };
 }
