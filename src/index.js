@@ -247,17 +247,24 @@ console.log(
 );
 
 const recommendations = runRecommendations(facts, triage);
-
+    
 // ======================
 // SCORE (PURE CALCULATION)
 // ======================
+const healthProfileResult = await pool.query(
+  "SELECT birth_date FROM health_profile WHERE user_id = $1",
+  [userId]
+);
+
+const healthProfile = healthProfileResult.rows[0];
+    
 const healthScore = calculateHealthRiskIndex({
   triage,
   dietSignals: recommendations.diet_analysis || null,
   lifestyle: facts.lifestyle,
   bmi: facts.bmi,
   nutrients: facts.nutrients,
-  birth_date: profile.birth_date
+  birth_date: healthProfile?.birth_date
 });
     const prevScoreRes = await client.query(
   `SELECT score, breakdown
