@@ -256,7 +256,8 @@ const healthScore = calculateHealthRiskIndex({
   dietSignals: recommendations.diet_analysis || null,
   lifestyle: facts.lifestyle,
   bmi: facts.bmi,
-  nutrients: facts.nutrients
+  nutrients: facts.nutrients,
+  birth_date: profile.birth_date
 });
     const prevScoreRes = await client.query(
   `SELECT score, breakdown
