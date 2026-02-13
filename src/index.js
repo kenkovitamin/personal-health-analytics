@@ -191,14 +191,15 @@ app.get("/recommendations/:userId", async (req, res) => {
         ? lifestyle.weight_kg / (heightM * heightM)
         : null;
 
-    const alcoholUnits = lifestyle.alcohol_units_per_week || 0;
-    const alcoholFreq = lifestyle.alcohol_frequency || "none";
-    const alcohol =
-      alcoholUnits >= 21 || alcoholFreq === "daily"
-        ? "high"
-        : alcoholUnits >= 7
-          ? "moderate"
-          : "low";
+   const alcoholUnits = lifestyle.alcohol_units_per_week || 0;
+
+let alcohol = "low";
+
+if (alcoholUnits >= 15) {
+  alcohol = "high";
+} else if (alcoholUnits >= 5) {
+  alcohol = "moderate";
+}
 
     const medsRes = await client.query(
       `SELECT m.name FROM user_medications um
