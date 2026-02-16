@@ -1,21 +1,18 @@
 // ==============================
 // Health Score Engine (v2)
 // Progressive age-based model
+// FIXED: smoking, vaping, alcohol
 // ==============================
 
 function calculateAge(birthDate) {
   if (!birthDate) return null;
-
   const today = new Date();
   const dob = new Date(birthDate);
-
   let age = today.getFullYear() - dob.getFullYear();
   const m = today.getMonth() - dob.getMonth();
-
   if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
     age--;
   }
-
   return age;
 }
 
@@ -27,8 +24,10 @@ export function calculateHealthRiskIndex({
   nutrients,
   birth_date
 }) {
+  console.log("=== HEALTH SCORE CALCULATION ===");
+  console.log("Lifestyle received:", JSON.stringify(lifestyle, null, 2));
+  
   let score = 100;
-
   const breakdown = {
     triage: 0,
     diet: 0,
@@ -55,22 +54,52 @@ export function calculateHealthRiskIndex({
     const riskPenalty = (dietSignals.diet_risks || []).length * 5;
     const warningPenalty = (dietSignals.diet_warnings || []).length * 3;
     const gapPenalty = (dietSignals.diet_gaps || []).length * 4;
-
     breakdown.diet = -(riskPenalty + warningPenalty + gapPenalty);
   }
 
   // ======================
-  // LIFESTYLE
+  // LIFESTYLE (FIXED)
   // ======================
+  
+  // SMOKING (now with severity)
   if (lifestyle?.smoking === true) {
-    breakdown.lifestyle -= 10;
+    const severity = lifestyle.smoking_severity || "light";
+    
+    if (severity === "heavy") {
+      breakdown.lifestyle -= 15; // worse than before
+    } else if (severity === "moderate") {
+      breakdown.lifestyle -= 10; // original penalty
+    } else if (severity === "light") {
+      breakdown.lifestyle -= 6; // lighter penalty
+    }
+    
+    console.log(`Smoking penalty: ${breakdown.lifestyle} (severity: ${severity})`);
   }
 
+  // VAPING (FIXED - now actually works!)
+  if (lifestyle?.vaping) {
+    if (lifestyle.vaping === "high") {
+      breakdown.lifestyle -= 8;
+      console.log("Vaping penalty: -8 (high)");
+    } else if (lifestyle.vaping === "moderate") {
+      breakdown.lifestyle -= 4;
+      console.log("Vaping penalty: -4 (moderate)");
+    } else if (lifestyle.vaping === "low") {
+      breakdown.lifestyle -= 2;
+      console.log("Vaping penalty: -2 (low)");
+    }
+  }
+
+  // ALCOHOL (was already working, but now with debug)
   if (lifestyle?.alcohol === "high") {
     breakdown.lifestyle -= 10;
+    console.log("Alcohol penalty: -10 (high)");
   } else if (lifestyle?.alcohol === "moderate") {
     breakdown.lifestyle -= 5;
+    console.log("Alcohol penalty: -5 (moderate)");
   }
+
+  console.log("Total lifestyle penalty:", breakdown.lifestyle);
 
   // ======================
   // METABOLIC (BMI)
@@ -85,7 +114,6 @@ export function calculateHealthRiskIndex({
   // AGE (progressive risk)
   // ======================
   const age = calculateAge(birth_date);
-
   if (typeof age === "number") {
     if (age >= 65) breakdown.metabolic -= 28;
     else if (age >= 60) breakdown.metabolic -= 22;
@@ -134,6 +162,12 @@ export function calculateHealthRiskIndex({
       : score >= 35
       ? "HIGH_RISK"
       : "CRITICAL";
+
+  console.log("=== FINAL HEALTH SCORE ===");
+  console.log("Score:", score);
+  console.log("Label:", label);
+  console.log("Breakdown:", breakdown);
+  console.log("===========================");
 
   return {
     score,
