@@ -194,17 +194,24 @@ app.get("/recommendations/:userId", async (req, res) => {
         ? lifestyle.weight_kg / (heightM * heightM)
         : null;
 
-    // ====================================
-    // ALCOHOL PROCESSING (FIXED)
-    // ====================================
-    const alcoholUnits = lifestyle.alcohol_units_per_week || 0;
-    let alcohol = "low";
+  // ====================================
+  // ALCOHOL PROCESSING (FIXED)
+  // ====================================
+let alcohol = "low";
 
-    if (alcoholUnits >= 15) {
-      alcohol = "high";
-    } else if (alcoholUnits >= 5) {
-      alcohol = "moderate";
-    }
+if (lifestyle.alcohol_units_per_week !== null && 
+    lifestyle.alcohol_units_per_week !== undefined) {
+  const alcoholUnits = lifestyle.alcohol_units_per_week;
+  if (alcoholUnits >= 15) {
+    alcohol = "high";
+  } else if (alcoholUnits >= 5) {
+    alcohol = "moderate";
+  } else {
+    alcohol = "low";
+  }
+} else if (lifestyle.alcohol_frequency) {
+  alcohol = lifestyle.alcohol_frequency;
+}
 
     // ====================================
     // SMOKING PROCESSING (FIXED)
@@ -229,7 +236,7 @@ app.get("/recommendations/:userId", async (req, res) => {
     // ====================================
     // VAPING PROCESSING (FIXED)
     // ====================================
-    const vaping = lifestyle.vape_frequency || "low"; // "low" | "moderate" | "high"
+    const vaping = lifestyle.vape_frequency || "none";
 
     const medsRes = await client.query(
       `SELECT m.name FROM user_medications um
