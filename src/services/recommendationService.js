@@ -102,34 +102,37 @@ export function runRecommendations(userFacts, triageResult) {
     );
   }
 
- // ---------- Diet signals ----------
-if (diet) {
-  const dietSignals = runDietSignals(diet, { diagnoses });
+  // ---------- Diet signals ----------
+  if (diet) {
+    const dietSignals = runDietSignals(diet, { diagnoses });
 
-  if (dietSignals?.diet_risks?.length) {
-    dietSignals.diet_risks.forEach(signal => {
-      if (!output.risk_summary.includes(signal)) {
-        output.risk_summary.push(signal);
-      }
-    });
-  }
+    if (dietSignals?.diet_risks?.length) {
+      dietSignals.diet_risks.forEach(signal => {
+        if (!output.risk_summary.includes(signal)) {
+          output.risk_summary.push(signal);
+        }
+      });
+    }
 
-  if (dietSignals?.diet_warnings?.length) {
-    dietSignals.diet_warnings.forEach(signal => {
-      if (!output.risk_summary.includes(signal)) {
-        output.risk_summary.push(signal);
-      }
-    });
-  }
+    if (dietSignals?.diet_warnings?.length) {
+      dietSignals.diet_warnings.forEach(signal => {
+        if (!output.risk_summary.includes(signal)) {
+          output.risk_summary.push(signal);
+        }
+      });
+    }
 
-  if (dietSignals?.diet_gaps?.length) {
-    dietSignals.diet_gaps.forEach(signal => {
-      if (!output.risk_summary.includes(signal)) {
-        output.risk_summary.push(signal);
-      }
-    });
+    if (dietSignals?.diet_gaps?.length) {
+      dietSignals.diet_gaps.forEach(signal => {
+        if (!output.risk_summary.includes(signal)) {
+          output.risk_summary.push(signal);
+        }
+      });
+    }
+
+    // Store diet analysis for health score
+    output.diet_analysis = dietSignals;
   }
-}
 
   // ---------- DIAGNOSIS OVERLAYS ----------
   if (Array.isArray(diagnoses) && diagnoses.includes("psoriasis")) {
@@ -165,18 +168,62 @@ if (diet) {
     );
   }
 
-  // ---------- LIFESTYLE ----------
+  // ---------- LIFESTYLE (FIXED) ----------
+  
+  // SMOKING (now with severity awareness)
   if (lifestyle.smoking === true) {
-    output.risk_summary.push("SMOKING_RISK");
+    const severity = lifestyle.smoking_severity || "light";
+    
+    if (severity === "heavy") {
+      output.risk_summary.push("HEAVY_SMOKING_RISK");
+      output.recommendations.lifestyle.push(
+        "URGENT: Structured smoking cessation program",
+        "Consider nicotine replacement therapy",
+        "Pulmonary function test recommended"
+      );
+    } else if (severity === "moderate") {
+      output.risk_summary.push("MODERATE_SMOKING_RISK");
+      output.recommendations.lifestyle.push(
+        "Structured smoking cessation plan",
+        "Consider nicotine patches or gum"
+      );
+    } else {
+      output.risk_summary.push("SMOKING_RISK");
+      output.recommendations.lifestyle.push(
+        "Smoking cessation support recommended"
+      );
+    }
+  }
+
+  // VAPING (NEW - was missing!)
+  if (lifestyle.vaping === "high") {
+    output.risk_summary.push("HIGH_VAPING_RISK");
     output.recommendations.lifestyle.push(
-      "Structured smoking cessation plan"
+      "Reduce or eliminate vaping",
+      "Monitor respiratory symptoms"
+    );
+  } else if (lifestyle.vaping === "moderate") {
+    output.risk_summary.push("MODERATE_VAPING_RISK");
+    output.recommendations.lifestyle.push(
+      "Consider reducing vaping frequency"
+    );
+  } else if (lifestyle.vaping === "low") {
+    output.recommendations.monitoring.push(
+      "Monitor vaping-related respiratory health"
     );
   }
 
+  // ALCOHOL
   if (lifestyle.alcohol === "high") {
-    output.risk_summary.push("ALCOHOL_RISK");
+    output.risk_summary.push("HIGH_ALCOHOL_RISK");
     output.recommendations.lifestyle.push(
-      "Strict alcohol cessation"
+      "Strict alcohol cessation",
+      "Liver function panel (ALT, AST, GGT)"
+    );
+  } else if (lifestyle.alcohol === "moderate") {
+    output.risk_summary.push("MODERATE_ALCOHOL_RISK");
+    output.recommendations.lifestyle.push(
+      "Reduce alcohol to <5 units/week"
     );
   }
 
