@@ -76,19 +76,18 @@ export function calculateHealthRiskIndex({
     console.log(`Smoking penalty: ${breakdown.lifestyle} (severity: ${severity})`);
   }
 
-  // VAPING (FIXED - now actually works!)
-  if (lifestyle?.vaping) {
-    if (lifestyle.vaping === "high") {
-      breakdown.lifestyle -= 8;
-      console.log("Vaping penalty: -8 (high)");
-    } else if (lifestyle.vaping === "moderate") {
-      breakdown.lifestyle -= 4;
-      console.log("Vaping penalty: -4 (moderate)");
-    } else if (lifestyle.vaping === "low") {
-      breakdown.lifestyle -= 2;
-      console.log("Vaping penalty: -2 (low)");
-    }
+  if (lifestyle?.vaping && lifestyle.vaping !== "none") {
+  if (lifestyle.vaping === "high") {
+    breakdown.lifestyle -= 8;
+    console.log("Vaping penalty: -8 (high)");
+  } else if (lifestyle.vaping === "moderate") {
+    breakdown.lifestyle -= 4;
+    console.log("Vaping penalty: -4 (moderate)");
+  } else if (lifestyle.vaping === "low") {
+    breakdown.lifestyle -= 2;
+    console.log("Vaping penalty: -2 (low)");
   }
+}
 
   // ALCOHOL (was already working, but now with debug)
   if (lifestyle?.alcohol === "high") {
