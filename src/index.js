@@ -185,21 +185,51 @@ app.get("/recommendations/:userId", async (req, res) => {
       return res.status(400).json({ error: "HEALTH_PROFILE_MISSING" });
     }
 
+    // ====================================
+    // BMI CALCULATION
+    // ====================================
     const heightM = lifestyle.height_cm / 100;
     const bmi =
       lifestyle.weight_kg && heightM
         ? lifestyle.weight_kg / (heightM * heightM)
         : null;
 
-   const alcoholUnits = lifestyle.alcohol_units_per_week || 0;
+    // ====================================
+    // ALCOHOL PROCESSING (FIXED)
+    // ====================================
+    const alcoholUnits = lifestyle.alcohol_units_per_week || 0;
+    let alcohol = "low";
 
-let alcohol = "low";
+    if (alcoholUnits >= 15) {
+      alcohol = "high";
+    } else if (alcoholUnits >= 5) {
+      alcohol = "moderate";
+    }
 
-if (alcoholUnits >= 15) {
-  alcohol = "high";
-} else if (alcoholUnits >= 5) {
-  alcohol = "moderate";
-}
+    // ====================================
+    // SMOKING PROCESSING (FIXED)
+    // ====================================
+    const isSmoking = lifestyle.smoking_status === "current";
+    const smokingYears = lifestyle.smoking_years || 0;
+    const cigarettesPerDay = lifestyle.cigarettes_per_day || 0;
+
+    // Calculate smoking severity
+    let smokingSeverity = "none";
+    if (isSmoking) {
+      const packYears = (cigarettesPerDay / 20) * smokingYears;
+      if (packYears >= 20 || cigarettesPerDay >= 20) {
+        smokingSeverity = "heavy";
+      } else if (packYears >= 10 || cigarettesPerDay >= 10) {
+        smokingSeverity = "moderate";
+      } else {
+        smokingSeverity = "light";
+      }
+    }
+
+    // ====================================
+    // VAPING PROCESSING (FIXED)
+    // ====================================
+    const vaping = lifestyle.vape_frequency || "low"; // "low" | "moderate" | "high"
 
     const medsRes = await client.query(
       `SELECT m.name FROM user_medications um
@@ -221,6 +251,9 @@ if (alcoholUnits >= 15) {
       [userId]
     );
 
+    // ====================================
+    // FACTS OBJECT (FIXED)
+    // ====================================
     const facts = {
       diagnoses: diagRes.rows.map(r => r.name),
       symptoms: symptomsRes.rows,
@@ -228,125 +261,141 @@ if (alcoholUnits >= 15) {
       medications: medsRes.rows.map(r => r.name),
       nutrients: nutrientsRes.rows,
       lifestyle: {
-        smoking: lifestyle.smoking_status === "current",
+        smoking: isSmoking,
+        smoking_severity: smokingSeverity,
+        smoking_years: smokingYears,
+        cigarettes_per_day: cigarettesPerDay,
+        vaping,
         alcohol
       },
       diet: dietRes.rows[0] || null
     };
     
-// ======================
-// TRIAGE
-// ======================
-const triage = await runTriage(facts);
+    console.log("=== LIFESTYLE DATA DEBUG ===");
+    console.log("Raw from DB:", {
+      smoking_status: lifestyle.smoking_status,
+      smoking_years: lifestyle.smoking_years,
+      cigarettes_per_day: lifestyle.cigarettes_per_day,
+      vape_frequency: lifestyle.vape_frequency,
+      alcohol_units_per_week: lifestyle.alcohol_units_per_week
+    });
+    console.log("Processed:", facts.lifestyle);
+    console.log("============================");
 
-// ======================
-// RECOMMENDATIONS
-// ======================
-console.log(
-  "RECOMMENDATION INPUT",
-  JSON.stringify(facts, null, 2)
-);
+    // ======================
+    // TRIAGE
+    // ======================
+    const triage = await runTriage(facts);
 
-const recommendations = runRecommendations(facts, triage);
+    // ======================
+    // RECOMMENDATIONS
+    // ======================
+    console.log(
+      "RECOMMENDATION INPUT",
+      JSON.stringify(facts, null, 2)
+    );
+
+    const recommendations = runRecommendations(facts, triage);
     
-// ======================
-// SCORE (PURE CALCULATION)
-// ======================
-const healthProfileResult = await pool.query(
-  "SELECT birth_date FROM health_profile WHERE user_id = $1",
-  [userId]
-);
+    // ======================
+    // SCORE (PURE CALCULATION)
+    // ======================
+    const healthProfileResult = await pool.query(
+      "SELECT birth_date FROM health_profile WHERE user_id = $1",
+      [userId]
+    );
 
-const healthProfile = healthProfileResult.rows[0];
+    const healthProfile = healthProfileResult.rows[0];
     
-const healthScore = calculateHealthRiskIndex({
-  triage,
-  dietSignals: recommendations.diet_analysis || null,
-  lifestyle: facts.lifestyle,
-  bmi: facts.bmi,
-  nutrients: facts.nutrients,
-  birth_date: healthProfile?.birth_date
-});
+    const healthScore = calculateHealthRiskIndex({
+      triage,
+      dietSignals: recommendations.diet_analysis || null,
+      lifestyle: facts.lifestyle,
+      bmi: facts.bmi,
+      nutrients: facts.nutrients,
+      birth_date: healthProfile?.birth_date
+    });
+
     const prevScoreRes = await client.query(
-  `SELECT score, breakdown
-   FROM user_health_score_history
-   WHERE user_id = $1
-   ORDER BY created_at DESC
-   LIMIT 1`,
-  [userId]
-);
+      `SELECT score, breakdown
+       FROM user_health_score_history
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId]
+    );
 
-const previousScore = prevScoreRes.rows[0] || null;
+    const previousScore = prevScoreRes.rows[0] || null;
 
-const delta = calculateHealthDelta(previousScore, healthScore);
+    const delta = calculateHealthDelta(previousScore, healthScore);
 
     await client.query(
-  `INSERT INTO user_health_score_history
-   (user_id, score, label, breakdown, triage_level)
-   VALUES ($1,$2,$3,$4,$5)`,
-  [
-    userId,
-    healthScore.score,
-    healthScore.label,
-    healthScore.breakdown,
-    triage.triage_level
-  ]
-);
+      `INSERT INTO user_health_score_history
+       (user_id, score, label, breakdown, triage_level)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [
+        userId,
+        healthScore.score,
+        healthScore.label,
+        healthScore.breakdown,
+        triage.triage_level
+      ]
+    );
     
-const explanation = generateHealthExplanation({
-  healthScore,
-  delta,
-  triage,
-  recommendations
-});
+    const explanation = generateHealthExplanation({
+      healthScore,
+      delta,
+      triage,
+      recommendations
+    });
   
-  const alerts = generateHealthAlerts({
-  healthScore,
-  delta,
-  triage
-});
+    const alerts = generateHealthAlerts({
+      healthScore,
+      delta,
+      triage
+    });
 
-const projections = projectHealthScore({
-  healthScore,
-  recommendations
-});
+    const projections = projectHealthScore({
+      healthScore,
+      recommendations
+    });
 
-// ======================
-// PERSIST DIET ANALYSIS (OPTIONAL)
-// ======================
-if (recommendations.diet_analysis) {
-  await client.query(
-    `INSERT INTO user_diet_analysis
-     (user_id, diet_risks, diet_warnings, diet_gaps, confidence)
-     VALUES ($1,$2,$3,$4,$5)
-     ON CONFLICT (user_id) DO UPDATE SET
-       diet_risks = EXCLUDED.diet_risks,
-       diet_warnings = EXCLUDED.diet_warnings,
-       diet_gaps = EXCLUDED.diet_gaps,
-       confidence = EXCLUDED.confidence,
-       updated_at = NOW()`,
-    [
-      userId,
-      recommendations.diet_analysis.diet_risks,
-      recommendations.diet_analysis.diet_warnings,
-      recommendations.diet_analysis.diet_gaps,
-      recommendations.diet_analysis.confidence
-    ]
-  );
-}
+    // ======================
+    // PERSIST DIET ANALYSIS (OPTIONAL)
+    // ======================
+    if (recommendations.diet_analysis) {
+      await client.query(
+        `INSERT INTO user_diet_analysis
+         (user_id, diet_risks, diet_warnings, diet_gaps, confidence)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (user_id) DO UPDATE SET
+           diet_risks = EXCLUDED.diet_risks,
+           diet_warnings = EXCLUDED.diet_warnings,
+           diet_gaps = EXCLUDED.diet_gaps,
+           confidence = EXCLUDED.confidence,
+           updated_at = NOW()`,
+        [
+          userId,
+          recommendations.diet_analysis.diet_risks,
+          recommendations.diet_analysis.diet_warnings,
+          recommendations.diet_analysis.diet_gaps,
+          recommendations.diet_analysis.confidence
+        ]
+      );
+    }
 
-// ======================
-// RESPONSE
-// ======================
-res.json({
-  triage,
-  health_score: healthScore,
-  delta,
-  explanation,
-  alerts,
-  projections,
-  recommendations
-});
+    // ======================
+    // RESPONSE
+    // ======================
+    res.json({
+      triage,
+      health_score: healthScore,
+      delta,
+      explanation,
+      alerts,
+      projections,
+      recommendations
+    });
 
   } catch (e) {
     res.status(500).json({ error: e.message });
