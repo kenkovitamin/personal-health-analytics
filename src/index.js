@@ -279,8 +279,6 @@ if (lifestyle.alcohol_units_per_week !== null &&
       diet: dietRes.rows[0] || null
     };
     
-    console.log("=== LIFESTYLE DATA DEBUG ===");
-    console.log("Raw from DB:", {
       smoking_status: lifestyle.smoking_status,
       smoking_years: lifestyle.smoking_years,
       cigarettes_per_day: lifestyle.cigarettes_per_day,
