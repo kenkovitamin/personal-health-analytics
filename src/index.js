@@ -285,8 +285,6 @@ if (lifestyle.alcohol_units_per_week !== null &&
       vape_frequency: lifestyle.vape_frequency,
       alcohol_units_per_week: lifestyle.alcohol_units_per_week
     });
-    console.log("Processed:", facts.lifestyle);
-    console.log("============================");
 
     // ======================
     // TRIAGE
@@ -296,10 +294,6 @@ if (lifestyle.alcohol_units_per_week !== null &&
     // ======================
     // RECOMMENDATIONS
     // ======================
-    console.log(
-      "RECOMMENDATION INPUT",
-      JSON.stringify(facts, null, 2)
-    );
 
     const recommendations = runRecommendations(facts, triage);
     
