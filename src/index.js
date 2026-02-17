@@ -279,13 +279,6 @@ if (lifestyle.alcohol_units_per_week !== null &&
       diet: dietRes.rows[0] || null
     };
     
-      smoking_status: lifestyle.smoking_status,
-      smoking_years: lifestyle.smoking_years,
-      cigarettes_per_day: lifestyle.cigarettes_per_day,
-      vape_frequency: lifestyle.vape_frequency,
-      alcohol_units_per_week: lifestyle.alcohol_units_per_week
-    });
-
     // ======================
     // TRIAGE
     // ======================
