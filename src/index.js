@@ -184,6 +184,13 @@ app.get("/recommendations/:userId", async (req, res) => {
     if (!lifestyle) {
       return res.status(400).json({ error: "HEALTH_PROFILE_MISSING" });
     }
+    
+console.log("=== RAW LIFESTYLE FROM DB ===");
+console.log("smoking_status:", lifestyle.smoking_status);
+console.log("alcohol_units_per_week:", lifestyle.alcohol_units_per_week);
+console.log("alcohol_frequency:", lifestyle.alcohol_frequency);
+console.log("vape_frequency:", lifestyle.vape_frequency);
+console.log("================================");
 
     // ====================================
     // BMI CALCULATION
