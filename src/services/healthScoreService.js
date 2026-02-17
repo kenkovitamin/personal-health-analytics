@@ -1,7 +1,9 @@
 // ==============================
-// Health Score Engine (v2)
+// Health Score Engine (v3)
 // Progressive age-based model
-// FIXED: smoking, vaping, alcohol
+// Nicotine unified risk model
+// Recovery logic
+// Alcohol-nicotine synergy
 // ==============================
 
 function calculateAge(birthDate) {
@@ -16,6 +18,37 @@ function calculateAge(birthDate) {
   return age;
 }
 
+// ==============================
+// RECOVERY FACTOR
+// Penalty decreases over time after quitting
+// ==============================
+function calculateRecoveryFactor(quitDate) {
+  if (!quitDate) return 1.0;
+
+  const today = new Date();
+  const quit = new Date(quitDate);
+  const monthsQuit = (today - quit) / (1000 * 60 * 60 * 24 * 30.44);
+
+  if (monthsQuit < 1)  return 1.0;
+  if (monthsQuit < 6)  return 0.7;
+  if (monthsQuit < 12) return 0.4;
+  if (monthsQuit < 24) return 0.2;
+  return 0.0;
+}
+
+// ==============================
+// BEHAVIORAL AGE FACTOR
+// Behavioral risk carries more weight with age
+// ==============================
+function calculateBehavioralAgeFactor(age) {
+  if (!age) return 1.0;
+  if (age >= 65) return 1.6;
+  if (age >= 55) return 1.4;
+  if (age >= 45) return 1.25;
+  if (age >= 35) return 1.1;
+  return 1.0;
+}
+
 export function calculateHealthRiskIndex({
   triage,
   dietSignals,
@@ -24,9 +57,6 @@ export function calculateHealthRiskIndex({
   nutrients,
   birth_date
 }) {
-  console.log("=== HEALTH SCORE CALCULATION ===");
-  console.log("Lifestyle received:", JSON.stringify(lifestyle, null, 2));
-  
   let score = 100;
   const breakdown = {
     triage: 0,
@@ -37,7 +67,7 @@ export function calculateHealthRiskIndex({
   };
 
   // ======================
-  // TRIAGE (dominant)
+  // TRIAGE (dominant factor)
   // ======================
   if (triage?.triage_level === "EMERGENCY") {
     breakdown.triage = -60;
@@ -51,70 +81,99 @@ export function calculateHealthRiskIndex({
   // DIET SIGNALS
   // ======================
   if (dietSignals) {
-    const riskPenalty = (dietSignals.diet_risks || []).length * 5;
+    const riskPenalty    = (dietSignals.diet_risks    || []).length * 5;
     const warningPenalty = (dietSignals.diet_warnings || []).length * 3;
-    const gapPenalty = (dietSignals.diet_gaps || []).length * 4;
+    const gapPenalty     = (dietSignals.diet_gaps     || []).length * 4;
     breakdown.diet = -(riskPenalty + warningPenalty + gapPenalty);
   }
 
   // ======================
-  // LIFESTYLE (FIXED)
+  // LIFESTYLE
   // ======================
-  
-  // SMOKING (now with severity)
+  const age = calculateAge(birth_date);
+  const ageFactor = calculateBehavioralAgeFactor(age);
+
+  // --- SMOKING BASE ---
+  let smokingBase = 0;
   if (lifestyle?.smoking === true) {
     const severity = lifestyle.smoking_severity || "light";
-    
-    if (severity === "heavy") {
-      breakdown.lifestyle -= 15; // worse than before
-    } else if (severity === "moderate") {
-      breakdown.lifestyle -= 10; // original penalty
-    } else if (severity === "light") {
-      breakdown.lifestyle -= 6; // lighter penalty
+    if (severity === "heavy")         smokingBase = -15;
+    else if (severity === "moderate") smokingBase = -10;
+    else                              smokingBase = -6;
+
+    const recoveryFactor = calculateRecoveryFactor(lifestyle.smoking_quit_date);
+    smokingBase = smokingBase * recoveryFactor;
+  } else if (lifestyle?.smoking === false && lifestyle?.smoking_quit_date) {
+    // Former smoker - apply recovery logic
+    const recoveryFactor = calculateRecoveryFactor(lifestyle.smoking_quit_date);
+    if (recoveryFactor > 0) {
+      smokingBase = -6 * recoveryFactor;
     }
-    
-    console.log(`Smoking penalty: ${breakdown.lifestyle} (severity: ${severity})`);
   }
 
+  // --- VAPING BASE ---
+  let vapingBase = 0;
   if (lifestyle?.vaping && lifestyle.vaping !== "none") {
-  if (lifestyle.vaping === "high") {
-    breakdown.lifestyle -= 8;
-    console.log("Vaping penalty: -8 (high)");
-  } else if (lifestyle.vaping === "moderate") {
-    breakdown.lifestyle -= 4;
-    console.log("Vaping penalty: -4 (moderate)");
-  } else if (lifestyle.vaping === "low") {
-    breakdown.lifestyle -= 2;
-    console.log("Vaping penalty: -2 (low)");
-  }
-}
+    if (lifestyle.vaping === "high")          vapingBase = -8;
+    else if (lifestyle.vaping === "moderate") vapingBase = -4;
+    else if (lifestyle.vaping === "low")      vapingBase = -2;
 
-  // ALCOHOL (was already working, but now with debug)
-  if (lifestyle?.alcohol === "high") {
-    breakdown.lifestyle -= 10;
-    console.log("Alcohol penalty: -10 (high)");
-  } else if (lifestyle?.alcohol === "moderate") {
-    breakdown.lifestyle -= 5;
-    console.log("Alcohol penalty: -5 (moderate)");
+    const recoveryFactor = calculateRecoveryFactor(lifestyle.vaping_quit_date);
+    vapingBase = vapingBase * recoveryFactor;
+  } else if (lifestyle?.vaping === "none" && lifestyle?.vaping_quit_date) {
+    // Former vaper - apply recovery logic
+    const recoveryFactor = calculateRecoveryFactor(lifestyle.vaping_quit_date);
+    if (recoveryFactor > 0) {
+      vapingBase = -2 * recoveryFactor;
+    }
   }
 
-  console.log("Total lifestyle penalty:", breakdown.lifestyle);
+  // --- NICOTINE SYNERGY ---
+  // Both active: combined penalty with multiplier, not a double hit
+  let nicotinePenalty = 0;
+  const bothActive = lifestyle?.smoking === true &&
+                     lifestyle?.vaping !== "none" &&
+                     lifestyle?.vaping;
+
+  if (bothActive) {
+    nicotinePenalty = (smokingBase + vapingBase) * 1.2;
+  } else {
+    nicotinePenalty = smokingBase + vapingBase;
+  }
+
+  // --- ALCOHOL ---
+  let alcoholPenalty = 0;
+  if (lifestyle?.alcohol === "high")          alcoholPenalty = -10;
+  else if (lifestyle?.alcohol === "moderate") alcoholPenalty = -5;
+
+  // --- ALCOHOL + NICOTINE SYNERGY ---
+  const hasNicotine = nicotinePenalty < 0;
+  let alcoholNicotineSynergy = 1.0;
+
+  if (hasNicotine && lifestyle?.alcohol === "high") {
+    alcoholNicotineSynergy = 1.2;
+  } else if (hasNicotine && lifestyle?.alcohol === "moderate") {
+    alcoholNicotineSynergy = 1.1;
+  }
+
+  // --- FINAL LIFESTYLE PENALTY ---
+  const rawLifestylePenalty = (nicotinePenalty + alcoholPenalty) * alcoholNicotineSynergy;
+  breakdown.lifestyle = Math.round(rawLifestylePenalty * ageFactor);
 
   // ======================
   // METABOLIC (BMI)
   // ======================
   if (typeof bmi === "number") {
-    if (bmi >= 30) breakdown.metabolic -= 15;
-    else if (bmi >= 25) breakdown.metabolic -= 8;
+    if (bmi >= 30)       breakdown.metabolic -= 15;
+    else if (bmi >= 25)  breakdown.metabolic -= 8;
     else if (bmi < 18.5) breakdown.metabolic -= 5;
   }
 
   // ======================
-  // AGE (progressive risk)
+  // AGE (progressive metabolic risk)
   // ======================
-  const age = calculateAge(birth_date);
   if (typeof age === "number") {
-    if (age >= 65) breakdown.metabolic -= 28;
+    if (age >= 65)      breakdown.metabolic -= 28;
     else if (age >= 60) breakdown.metabolic -= 22;
     else if (age >= 55) breakdown.metabolic -= 17;
     else if (age >= 50) breakdown.metabolic -= 13;
@@ -127,12 +186,12 @@ export function calculateHealthRiskIndex({
   }
 
   // ======================
-  // NUTRIENTS (light weight)
+  // NUTRIENTS
   // ======================
   if (Array.isArray(nutrients)) {
     nutrients.forEach(n => {
       if (n.value === "deficient") breakdown.nutrients -= 3;
-      if (n.value === "excess") breakdown.nutrients -= 2;
+      if (n.value === "excess")    breakdown.nutrients -= 2;
     });
   }
 
@@ -146,31 +205,17 @@ export function calculateHealthRiskIndex({
     breakdown.metabolic +
     breakdown.nutrients;
 
-  // Clamp 0–100
-  if (score < 0) score = 0;
+  if (score < 0)   score = 0;
   if (score > 100) score = 100;
 
   // ======================
   // LABEL
   // ======================
   const label =
-    score >= 80
-      ? "LOW_RISK"
-      : score >= 55
-      ? "MODERATE_RISK"
-      : score >= 35
-      ? "HIGH_RISK"
-      : "CRITICAL";
+    score >= 80 ? "LOW_RISK"      :
+    score >= 55 ? "MODERATE_RISK" :
+    score >= 35 ? "HIGH_RISK"     :
+                  "CRITICAL";
 
-  console.log("=== FINAL HEALTH SCORE ===");
-  console.log("Score:", score);
-  console.log("Label:", label);
-  console.log("Breakdown:", breakdown);
-  console.log("===========================");
-
-  return {
-    score,
-    breakdown,
-    label
-  };
+  return { score, breakdown, label };
 }
