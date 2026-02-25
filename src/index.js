@@ -160,7 +160,7 @@ app.get("/recommendations/:userId", async (req, res) => {
 
   try {
     // =========================
-    // FETCH RAW DATA (keep all SQL queries as is)
+    // FETCH RAW DATA
     // =========================
     const diagRes = await client.query(
       `SELECT c.name FROM user_conditions uc
@@ -210,7 +210,7 @@ app.get("/recommendations/:userId", async (req, res) => {
     );
 
     // ====================================
-    // BMI CALCULATION (existing logic kept)
+    // BMI CALCULATION
     // ====================================
     const heightM = lifestyle.height_cm / 100;
     const bmi =
@@ -219,7 +219,7 @@ app.get("/recommendations/:userId", async (req, res) => {
         : null;
 
     // ====================================
-    // ALCOHOL PROCESSING (existing logic kept)
+    // ALCOHOL PROCESSING
     // ====================================
     let alcohol = "low";
     if (
@@ -236,7 +236,7 @@ app.get("/recommendations/:userId", async (req, res) => {
     }
 
     // ====================================
-    // SMOKING PROCESSING (existing logic kept)
+    // SMOKING PROCESSING
     // ====================================
     const isSmoking = lifestyle.smoking_status === "current";
     const smokingYears = lifestyle.smoking_years || 0;
@@ -251,63 +251,35 @@ app.get("/recommendations/:userId", async (req, res) => {
     }
 
     // ====================================
-    // VAPING PROCESSING (existing logic kept)
+    // VAPING PROCESSING
     // ====================================
     const vaping = lifestyle.vape_frequency || "none";
 
     // ====================================
-    // BUILD FACTS FOR ENTERPRISE (new, integrated)
+    // BUILD FACTS FOR ENTERPRISE
     // ====================================
     const facts = await buildEnterpriseFactsFromCurrentData(userId, client);
 
     // ====================================
     // ENTERPRISE HEALTH SCORE
     // ====================================
-    const healthScore = calculateHealthScore(facts, domainConfig);
+    const enterpriseHealthScore = calculateHealthScore(facts, domainConfig);
 
     // ====================================
-    // TRIAGE & RECOMMENDATIONS (legacy logic kept)
+    // TRIAGE & RECOMMENDATIONS
     // ====================================
     const triage = await runTriage(facts);
     const recommendations = runRecommendations(facts, triage);
 
     // ====================================
-    // RESPONSE
+    // PURE HEALTH SCORE CALCULATION
     // ====================================
-    res.json({
-      triage,
-      health_score: healthScore,
-      recommendations
-    });
-
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  } finally {
-    client.release();
-  }
-});
-    
-    // ======================
-    // TRIAGE
-    // ======================
-    const triage = await runTriage(facts);
-
-    // ======================
-    // RECOMMENDATIONS
-    // ======================
-
-    const recommendations = runRecommendations(facts, triage);
-    
-    // ======================
-    // SCORE (PURE CALCULATION)
-    // ======================
-    const healthProfileResult = await pool.query(
+    const healthProfileResult = await client.query(
       "SELECT birth_date FROM health_profile WHERE user_id = $1",
       [userId]
     );
-
     const healthProfile = healthProfileResult.rows[0];
-    
+
     const healthScore = calculateHealthRiskIndex({
       triage,
       dietSignals: recommendations.diet_analysis || null,
@@ -325,9 +297,7 @@ app.get("/recommendations/:userId", async (req, res) => {
        LIMIT 1`,
       [userId]
     );
-
     const previousScore = prevScoreRes.rows[0] || null;
-
     const delta = calculateHealthDelta(previousScore, healthScore);
 
     await client.query(
@@ -342,28 +312,17 @@ app.get("/recommendations/:userId", async (req, res) => {
         triage.triage_level
       ]
     );
-    
-    const explanation = generateHealthExplanation({
-      healthScore,
-      delta,
-      triage,
-      recommendations
-    });
-  
-    const alerts = generateHealthAlerts({
-      healthScore,
-      delta,
-      triage
-    });
 
-    const projections = projectHealthScore({
-      healthScore,
-      recommendations
-    });
+    // ====================================
+    // EXPLANATION, ALERTS, PROJECTIONS
+    // ====================================
+    const explanation = generateHealthExplanation({ healthScore, delta, triage, recommendations });
+    const alerts = generateHealthAlerts({ healthScore, delta, triage });
+    const projections = projectHealthScore({ healthScore, recommendations });
 
-    // ======================
+    // ====================================
     // PERSIST DIET ANALYSIS (OPTIONAL)
-    // ======================
+    // ====================================
     if (recommendations.diet_analysis) {
       await client.query(
         `INSERT INTO user_diet_analysis
@@ -385,9 +344,9 @@ app.get("/recommendations/:userId", async (req, res) => {
       );
     }
 
-    // ======================
-    // RESPONSE
-    // ======================
+    // ====================================
+    // FINAL RESPONSE
+    // ====================================
     res.json({
       triage,
       health_score: healthScore,
@@ -395,7 +354,8 @@ app.get("/recommendations/:userId", async (req, res) => {
       explanation,
       alerts,
       projections,
-      recommendations
+      recommendations,
+      enterprise_health_score: enterpriseHealthScore
     });
 
   } catch (e) {
