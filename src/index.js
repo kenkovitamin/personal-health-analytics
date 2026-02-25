@@ -11,6 +11,9 @@ import { calculateHealthDelta } from "./services/healthDeltaService.js";
 import { generateHealthExplanation } from "./services/healthExplainService.js";
 import { generateHealthAlerts } from "./services/healthAlertService.js";
 import { projectHealthScore } from "./services/healthProjectionService.js";
+import { buildEnterpriseFactsFromCurrentData } from "./services/factsBuilder.js";
+import { calculateHealthScore } from "./services/enterpriseHealthScoreService.js";
+import domainConfig from "./config/domainConfig.json";
 
 const app = express();
 app.use(bodyParser.json());
@@ -149,13 +152,16 @@ app.get("/records", authMiddleware, async (req, res) => {
 });
 
 /* =========================
-   RECOMMENDATIONS PIPELINE
+   RECOMMENDATIONS PIPELINE (Enterprise integrated)
 ========================= */
 app.get("/recommendations/:userId", async (req, res) => {
   const userId = req.params.userId;
   const client = await pool.connect();
 
   try {
+    // =========================
+    // FETCH RAW DATA (keep all SQL queries as is)
+    // =========================
     const diagRes = await client.query(
       `SELECT c.name FROM user_conditions uc
        JOIN conditions c ON uc.condition_id = c.id
@@ -181,63 +187,7 @@ app.get("/recommendations/:userId", async (req, res) => {
     );
 
     const lifestyle = lifestyleRes.rows[0];
-    if (!lifestyle) {
-      return res.status(400).json({ error: "HEALTH_PROFILE_MISSING" });
-    }
-    
-    // ====================================
-    // BMI CALCULATION
-    // ====================================
-    const heightM = lifestyle.height_cm / 100;
-    const bmi =
-      lifestyle.weight_kg && heightM
-        ? lifestyle.weight_kg / (heightM * heightM)
-        : null;
-
-     // ====================================
-    // ALCOHOL PROCESSING
-    // ====================================
- let alcohol = "low";
-
-if (lifestyle.alcohol_units_per_week !== null && 
-    lifestyle.alcohol_units_per_week !== undefined &&
-    lifestyle.alcohol_units_per_week > 0) {
-  const alcoholUnits = lifestyle.alcohol_units_per_week;
-  if (alcoholUnits >= 15) {
-    alcohol = "high";
-  } else if (alcoholUnits >= 5) {
-    alcohol = "moderate";
-  } else {
-    alcohol = "low";
-  }
-} else if (lifestyle.alcohol_frequency) {
-  alcohol = lifestyle.alcohol_frequency;
-}
-
-    // ====================================
-    // SMOKING PROCESSING (FIXED)
-    // ====================================
-    const isSmoking = lifestyle.smoking_status === "current";
-    const smokingYears = lifestyle.smoking_years || 0;
-    const cigarettesPerDay = lifestyle.cigarettes_per_day || 0;
-
-    // Calculate smoking severity
-    let smokingSeverity = "none";
-    if (isSmoking) {
-      const packYears = (cigarettesPerDay / 20) * smokingYears;
-      if (packYears >= 20 || cigarettesPerDay >= 20) {
-        smokingSeverity = "heavy";
-      } else if (packYears >= 10 || cigarettesPerDay >= 10) {
-        smokingSeverity = "moderate";
-      } else {
-        smokingSeverity = "light";
-      }
-    }
-
-    // ====================================
-    // VAPING PROCESSING (FIXED)
-    // ====================================
-    const vaping = lifestyle.vape_frequency || "none";
+    if (!lifestyle) return res.status(400).json({ error: "HEALTH_PROFILE_MISSING" });
 
     const medsRes = await client.query(
       `SELECT m.name FROM user_medications um
@@ -258,6 +208,84 @@ if (lifestyle.alcohol_units_per_week !== null &&
       `SELECT * FROM user_diet_profile WHERE user_id = $1`,
       [userId]
     );
+
+    // ====================================
+    // BMI CALCULATION (existing logic kept)
+    // ====================================
+    const heightM = lifestyle.height_cm / 100;
+    const bmi =
+      lifestyle.weight_kg && heightM
+        ? lifestyle.weight_kg / (heightM * heightM)
+        : null;
+
+    // ====================================
+    // ALCOHOL PROCESSING (existing logic kept)
+    // ====================================
+    let alcohol = "low";
+    if (
+      lifestyle.alcohol_units_per_week !== null &&
+      lifestyle.alcohol_units_per_week !== undefined &&
+      lifestyle.alcohol_units_per_week > 0
+    ) {
+      const alcoholUnits = lifestyle.alcohol_units_per_week;
+      if (alcoholUnits >= 15) alcohol = "high";
+      else if (alcoholUnits >= 5) alcohol = "moderate";
+      else alcohol = "low";
+    } else if (lifestyle.alcohol_frequency) {
+      alcohol = lifestyle.alcohol_frequency;
+    }
+
+    // ====================================
+    // SMOKING PROCESSING (existing logic kept)
+    // ====================================
+    const isSmoking = lifestyle.smoking_status === "current";
+    const smokingYears = lifestyle.smoking_years || 0;
+    const cigarettesPerDay = lifestyle.cigarettes_per_day || 0;
+
+    let smokingSeverity = "none";
+    if (isSmoking) {
+      const packYears = (cigarettesPerDay / 20) * smokingYears;
+      if (packYears >= 20 || cigarettesPerDay >= 20) smokingSeverity = "heavy";
+      else if (packYears >= 10 || cigarettesPerDay >= 10) smokingSeverity = "moderate";
+      else smokingSeverity = "light";
+    }
+
+    // ====================================
+    // VAPING PROCESSING (existing logic kept)
+    // ====================================
+    const vaping = lifestyle.vape_frequency || "none";
+
+    // ====================================
+    // BUILD FACTS FOR ENTERPRISE (new, integrated)
+    // ====================================
+    const facts = await buildEnterpriseFactsFromCurrentData(userId, client);
+
+    // ====================================
+    // ENTERPRISE HEALTH SCORE
+    // ====================================
+    const healthScore = calculateHealthScore(facts, domainConfig);
+
+    // ====================================
+    // TRIAGE & RECOMMENDATIONS (legacy logic kept)
+    // ====================================
+    const triage = await runTriage(facts);
+    const recommendations = runRecommendations(facts, triage);
+
+    // ====================================
+    // RESPONSE
+    // ====================================
+    res.json({
+      triage,
+      health_score: healthScore,
+      recommendations
+    });
+
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
 
     // ====================================
     // FACTS OBJECT (FIXED)
