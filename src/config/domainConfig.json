@@ -1,0 +1,100 @@
+{
+  "domainName": "health_intelligence",
+  "weights": {
+    "bmi": 0.2,
+    "smoking": 0.25,
+    "alcohol": 0.15,
+    "vaping": 0.1,
+    "nutrients": 0.15,
+    "medications": 0.05,
+    "diet": 0.1,
+    "diagnoses": 0.05,
+    "symptoms": 0.05
+  },
+  "thresholds": {
+    "bmi": {
+      "underweight": 18.5,
+      "normal": 24.9,
+      "overweight": 29.9,
+      "obese": 40
+    },
+    "smoking": {
+      "light": 5,
+      "moderate": 15,
+      "heavy": 25
+    },
+    "alcohol": {
+      "low": 5,
+      "moderate": 14,
+      "high": 30
+    },
+    "vaping": {
+      "none": 0,
+      "light": 1,
+      "moderate": 3,
+      "heavy": 5
+    },
+    "nutrients": {
+      "vitaminD": { "min": 20, "max": 50 },
+      "iron": { "min": 50, "max": 170 },
+      "magnesium": { "min": 1.5, "max": 2.5 },
+      "calcium": { "min": 8.5, "max": 10.5 },
+      "vitaminB12": { "min": 200, "max": 900 }
+    }
+  },
+  "scoringRules": {
+    "bmi": {
+      "underweight": -10,
+      "normal": 20,
+      "overweight": -5,
+      "obese": -15
+    },
+    "smoking": {
+      "none": 20,
+      "light": 10,
+      "moderate": -5,
+      "heavy": -20
+    },
+    "alcohol": {
+      "low": 10,
+      "moderate": 0,
+      "high": -10
+    },
+    "vaping": {
+      "none": 10,
+      "light": 5,
+      "moderate": -5,
+      "heavy": -10
+    },
+    "nutrients": {
+      "deficient": -10,
+      "optimal": 10,
+      "excess": -5
+    },
+    "medications": {
+      "critical": -10,
+      "normal": 0
+    },
+    "diet": {
+      "balanced": 10,
+      "needs_improvement": -5
+    },
+    "diagnoses": {
+      "chronic": -15,
+      "controlled": 5,
+      "none": 20
+    },
+    "symptoms": {
+      "severe": -10,
+      "moderate": -5,
+      "mild": 0,
+      "none": 10
+    }
+  },
+  "healthScoreRanges": {
+    "poor": 0,
+    "average": 40,
+    "good": 70,
+    "excellent": 90
+  }
+}
