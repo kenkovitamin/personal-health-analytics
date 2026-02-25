@@ -13,7 +13,7 @@ import { generateHealthAlerts } from "./services/healthAlertService.js";
 import { projectHealthScore } from "./services/healthProjectionService.js";
 import { buildEnterpriseFactsFromCurrentData } from "./services/factsBuilder.js";
 import { calculateHealthScore } from "./services/enterpriseHealthScoreService.js";
-import domainConfig from "./config/domainConfig.json";
+import domainConfig from "./config/domainConfig.json" assert { type: "json" };
 
 const app = express();
 app.use(bodyParser.json());
