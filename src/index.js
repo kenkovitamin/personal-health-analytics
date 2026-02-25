@@ -286,28 +286,6 @@ app.get("/recommendations/:userId", async (req, res) => {
     client.release();
   }
 });
-
-    // ====================================
-    // FACTS OBJECT (FIXED)
-    // ====================================
-   const facts = {
-  diagnoses: diagRes.rows.map(r => r.name),
-  symptoms: symptomsRes.rows,
-  bmi,
-  medications: medsRes.rows.map(r => r.name),
-  nutrients: nutrientsRes.rows,
-  lifestyle: {
-    smoking: isSmoking,
-    smoking_severity: smokingSeverity,
-    smoking_years: smokingYears,
-    cigarettes_per_day: cigarettesPerDay,
-    smoking_quit_date: lifestyle.smoking_quit_date || null,
-    vaping,
-    vaping_quit_date: lifestyle.vaping_quit_date || null,
-    alcohol
-  },
-  diet: dietRes.rows[0] || null
-};
     
     // ======================
     // TRIAGE
