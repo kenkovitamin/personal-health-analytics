@@ -292,6 +292,12 @@ if (lifestyle.alcohol_units_per_week !== null &&
     // ======================
 
     const recommendations = runRecommendations(facts, triage);
+
+    // ======================
+    // DISEASE
+    // ======================
+    
+    const diseaseInsights = runDiseaseEngine(facts, "psoriasis");
     
     // ======================
     // SCORE (PURE CALCULATION)
@@ -390,7 +396,8 @@ if (lifestyle.alcohol_units_per_week !== null &&
       explanation,
       alerts,
       projections,
-      recommendations
+      recommendations,
+      disease: diseaseInsights
     });
 
   } catch (e) {
