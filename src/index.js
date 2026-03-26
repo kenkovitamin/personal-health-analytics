@@ -11,6 +11,7 @@ import { calculateHealthDelta } from "./services/healthDeltaService.js";
 import { generateHealthExplanation } from "./services/healthExplainService.js";
 import { generateHealthAlerts } from "./services/healthAlertService.js";
 import { projectHealthScore } from "./services/healthProjectionService.js";
+import { runDiseaseEngine } from "./services/diseaseEngine.js";
 
 const app = express();
 app.use(bodyParser.json());
