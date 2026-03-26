@@ -17,7 +17,7 @@ export function runDiseaseEngine(facts, disease) {
     inflammation * config.weights.inflammation +
     immune * config.weights.immune +
     gut * config.weights.gut +
-    lifestyle * config.weights.lifecycle;
+    lifestyle * config.weights.lifestyle
 
   return {
     disease,
