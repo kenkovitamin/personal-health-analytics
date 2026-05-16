@@ -12,6 +12,7 @@ import { generateHealthExplanation } from "./services/healthExplainService.js";
 import { generateHealthAlerts } from "./services/healthAlertService.js";
 import { projectHealthScore } from "./services/healthProjectionService.js";
 import { runDiseaseEngine } from "./services/diseaseEngine.js";
+import { generatePsoriasisRecommendations } from "./services/psoriasisRecommendationService.js";
 
 const app = express();
 app.use(bodyParser.json());
@@ -827,6 +828,123 @@ app.get("/health-profile", authMiddleware, async (req, res) => {
     }
 
     res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
+
+/* =========================
+   PSORIASIS RECOMMENDATIONS
+========================= */
+ 
+app.get("/psoriasis-recommendations", authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const client = await pool.connect();
+ 
+  try {
+    // Get psoriasis profile
+    const profileRes = await client.query(
+      "SELECT * FROM psoriasis_profile WHERE user_id = $1",
+      [userId]
+    );
+ 
+    if (profileRes.rows.length === 0) {
+      return res.status(404).json({ 
+        error: "Psoriasis profile not found. Please complete onboarding first." 
+      });
+    }
+ 
+    // Get health profile
+    const healthRes = await client.query(
+      "SELECT * FROM health_profile WHERE user_id = $1",
+      [userId]
+    );
+ 
+    // Get latest PAI calculation
+    const paiRes = await client.query(
+      `SELECT * FROM psoriasis_activity_history
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId]
+    );
+ 
+    // Get recent symptoms
+    const symptomsRes = await client.query(
+      `SELECT * FROM psoriasis_symptom_logs
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 7`,
+      [userId]
+    );
+ 
+    // Get nutrients
+    const nutrientsRes = await client.query(
+      `SELECT n.code, un.value, un.unit
+       FROM user_nutrients un
+       JOIN nutrients n ON un.nutrient_id = n.id
+       WHERE un.user_id = $1`,
+      [userId]
+    );
+ 
+    const psoriasisProfile = profileRes.rows[0];
+    const healthProfile = healthRes.rows[0];
+    const latestPAI = paiRes.rows[0];
+    const recentSymptoms = symptomsRes.rows;
+    const nutrients = nutrientsRes.rows;
+ 
+    // If no PAI calculated yet, calculate it now
+    let paiData;
+    if (!latestPAI) {
+      const facts = {
+        psoriasis: psoriasisProfile,
+        bmi: healthProfile ? 
+          (healthProfile.weight_kg / Math.pow(healthProfile.height_cm / 100, 2)) : null,
+        lifestyle: {
+          smoking: healthProfile?.smoking_status === "current",
+          alcohol: healthProfile?.alcohol_frequency || "low",
+          activity_level: healthProfile?.activity_level
+        },
+        nutrients: nutrients.map(n => ({ 
+          code: n.code, 
+          value: parseFloat(n.value) || 0
+        })),
+        recentSymptoms
+      };
+ 
+      const diseaseScore = runDiseaseEngine(facts, "psoriasis");
+      paiData = {
+        pai_score: diseaseScore.score,
+        breakdown: diseaseScore.breakdown
+      };
+    } else {
+      paiData = {
+        pai_score: parseFloat(latestPAI.pai_score),
+        breakdown: JSON.parse(latestPAI.breakdown)
+      };
+    }
+ 
+    // Generate recommendations
+    const userProfile = {
+      psoriasis: psoriasisProfile,
+      lifestyle: {
+        smoking: healthProfile?.smoking_status === "current",
+        alcohol: healthProfile?.alcohol_frequency || "low"
+      },
+      recentSymptoms
+    };
+ 
+    const recommendations = generatePsoriasisRecommendations(paiData, userProfile);
+ 
+    res.json({
+      pai_score: paiData.pai_score,
+      breakdown: paiData.breakdown,
+      recommendations,
+      generated_at: new Date()
+    });
+ 
   } catch (e) {
     res.status(500).json({ error: e.message });
   } finally {
