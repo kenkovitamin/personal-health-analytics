@@ -729,6 +729,111 @@ app.get("/psoriasis-score", authMiddleware, async (req, res) => {
   }
 });
 
+/* =========================
+   HEALTH PROFILE
+========================= */
+
+// Create or update health profile
+app.post("/health-profile", authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const {
+    gender,
+    birth_date,
+    height_cm,
+    weight_kg,
+    activity_level,
+    smoking_status,
+    smoking_years,
+    cigarettes_per_day,
+    vape_frequency,
+    alcohol_frequency,
+    alcohol_units_per_week,
+    smoking_quit_date,
+    vaping_quit_date
+  } = req.body;
+
+  // Validation
+  if (!birth_date || !height_cm || !weight_kg || !smoking_status || !alcohol_frequency) {
+    return res.status(400).json({ 
+      error: "Required fields: birth_date, height_cm, weight_kg, smoking_status, alcohol_frequency" 
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `INSERT INTO health_profile (
+        user_id, gender, birth_date, height_cm, weight_kg, activity_level,
+        smoking_status, smoking_years, cigarettes_per_day, vape_frequency,
+        alcohol_frequency, alcohol_units_per_week, smoking_quit_date, vaping_quit_date,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+      ON CONFLICT (user_id) 
+      DO UPDATE SET
+        gender = EXCLUDED.gender,
+        birth_date = EXCLUDED.birth_date,
+        height_cm = EXCLUDED.height_cm,
+        weight_kg = EXCLUDED.weight_kg,
+        activity_level = EXCLUDED.activity_level,
+        smoking_status = EXCLUDED.smoking_status,
+        smoking_years = EXCLUDED.smoking_years,
+        cigarettes_per_day = EXCLUDED.cigarettes_per_day,
+        vape_frequency = EXCLUDED.vape_frequency,
+        alcohol_frequency = EXCLUDED.alcohol_frequency,
+        alcohol_units_per_week = EXCLUDED.alcohol_units_per_week,
+        smoking_quit_date = EXCLUDED.smoking_quit_date,
+        vaping_quit_date = EXCLUDED.vaping_quit_date,
+        updated_at = NOW()
+      RETURNING *`,
+      [
+        userId,
+        gender || null,
+        birth_date,
+        height_cm,
+        weight_kg,
+        activity_level || null,
+        smoking_status,
+        smoking_years || null,
+        cigarettes_per_day || null,
+        vape_frequency || null,
+        alcohol_frequency,
+        alcohol_units_per_week || null,
+        smoking_quit_date || null,
+        vaping_quit_date || null
+      ]
+    );
+
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Get health profile
+app.get("/health-profile", authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const client = await pool.connect();
+
+  try {
+    const result = await client.query(
+      "SELECT * FROM health_profile WHERE user_id = $1",
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Health profile not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
+
 /* ========================= */
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
