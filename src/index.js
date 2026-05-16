@@ -922,7 +922,7 @@ app.get("/psoriasis-recommendations", authMiddleware, async (req, res) => {
     } else {
       paiData = {
         pai_score: parseFloat(latestPAI.pai_score),
-        breakdown: JSON.parse(latestPAI.breakdown)
+        breakdown: latestPAI.breakdown
       };
     }
  
