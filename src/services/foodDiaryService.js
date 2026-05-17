@@ -11,9 +11,13 @@ const USDA_BASE_URL = "https://api.nal.usda.gov/fdc/v1";
 // Search for foods in USDA database
 export async function searchFood(query) {
   try {
-    const response = await fetch(
-      `${USDA_BASE_URL}/foods/search?query=${encodeURIComponent(query)}&pageSize=10&api_key=${USDA_API_KEY}`
-    );
+    const url = `${USDA_BASE_URL}/foods/search?query=${encodeURIComponent(query)}&pageSize=10&api_key=${USDA_API_KEY}`;
+    
+    console.log("USDA Request URL:", url);
+    
+    const response = await fetch(url);
+
+    console.log("USDA Response status:", response.status);
 
     if (!response.ok) {
       throw new Error(`USDA API error: ${response.status}`);
@@ -39,9 +43,13 @@ export async function searchFood(query) {
 // Get detailed food info by FDC ID
 export async function getFoodDetails(fdcId) {
   try {
-    const response = await fetch(
-      `${USDA_BASE_URL}/food/${fdcId}?api_key=${USDA_API_KEY}`
-    );
+    const url = `${USDA_BASE_URL}/food/${fdcId}?api_key=${USDA_API_KEY}`;
+    
+    console.log("USDA Details URL:", url);
+    
+    const response = await fetch(url);
+
+    console.log("USDA Details Response status:", response.status);
 
     if (!response.ok) {
       throw new Error(`USDA API error: ${response.status}`);
