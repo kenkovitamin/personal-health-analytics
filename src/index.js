@@ -14,6 +14,7 @@ import { projectHealthScore } from "./services/healthProjectionService.js";
 import { runDiseaseEngine } from "./services/diseaseEngine.js";
 import { generatePsoriasisRecommendations } from "./services/psoriasisRecommendationService.js";
 import { searchFood, getFoodDetails, calculateFoodInflammatoryLoad } from "./services/foodDiaryService.js";
+import { analyzeNutrientDeficiencies, generateNutrientRecommendations } from "./services/nutrientAnalysisService.js";
 
 const app = express();
 app.use(bodyParser.json());
@@ -1142,6 +1143,77 @@ app.get("/nutrition-summary", authMiddleware, async (req, res) => {
       period,
       total_meals: Object.keys(meals).length,
       meals: Object.values(meals).slice(0, 20)
+    });
+
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
+
+/* =========================
+   NUTRIENT ANALYSIS
+========================= */
+
+app.get("/nutrient-analysis", authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { period = "week" } = req.query;
+
+  let days = 7;
+  let dateFilter = "meal_time >= NOW() - INTERVAL '7 days'";
+  
+  if (period === "day") {
+    days = 1;
+    dateFilter = "meal_time >= NOW() - INTERVAL '1 day'";
+  } else if (period === "month") {
+    days = 30;
+    dateFilter = "meal_time >= NOW() - INTERVAL '30 days'";
+  }
+
+  const client = await pool.connect();
+  try {
+    const mealsResult = await client.query(
+      `SELECT m.id, mi.food_id, mi.quantity, f.name
+       FROM meals m
+       JOIN meal_items mi ON m.id = mi.meal_id
+       JOIN foods f ON mi.food_id = f.id
+       WHERE m.user_id = $1 AND ${dateFilter}`,
+      [userId]
+    );
+
+    if (mealsResult.rows.length === 0) {
+      return res.json({
+        period,
+        message: "No food logs found for this period. Start logging meals to see nutrient analysis."
+      });
+    }
+
+    const nutrientTotals = {
+      protein: 0,
+      fiber: 0,
+      omega3: 0,
+      vitaminD: 0,
+      vitaminC: 0,
+      vitaminE: 0,
+      zinc: 0,
+      calcium: 0,
+      magnesium: 0,
+      iron: 0
+    };
+    
+    const analysis = analyzeNutrientDeficiencies(nutrientTotals, days);
+    const recommendations = generateNutrientRecommendations(
+      analysis.deficiencies,
+      analysis.warnings
+    );
+
+    res.json({
+      period,
+      days_analyzed: days,
+      meals_count: mealsResult.rows.length,
+      analysis,
+      recommendations
     });
 
   } catch (e) {
