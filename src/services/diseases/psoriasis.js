@@ -91,7 +91,14 @@ export const psoriasisConfig = {
   // ==============================
   gut: (facts) => {
     let score = 0;
-
+    
+ // Inflammatory load from recent food logs
+  if (facts.inflammatory_load_avg !== undefined) {
+    if (facts.inflammatory_load_avg > 3) score += 2;
+    else if (facts.inflammatory_load_avg > 1) score += 1;
+    else if (facts.inflammatory_load_avg < -2) score -= 1;
+  }
+    
     // Diet quality indicators
     if (facts.diet) {
       // Low fiber (gut dysbiosis)
