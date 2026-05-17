@@ -13,6 +13,7 @@ import { generateHealthAlerts } from "./services/healthAlertService.js";
 import { projectHealthScore } from "./services/healthProjectionService.js";
 import { runDiseaseEngine } from "./services/diseaseEngine.js";
 import { generatePsoriasisRecommendations } from "./services/psoriasisRecommendationService.js";
+import { searchFood, getFoodDetails, calculateFoodInflammatoryLoad } from "./services/foodDiaryService.js";
 
 const app = express();
 app.use(bodyParser.json());
@@ -945,6 +946,196 @@ app.get("/psoriasis-recommendations", authMiddleware, async (req, res) => {
       generated_at: new Date()
     });
  
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
+
+/* =========================
+   FOOD DIARY
+========================= */
+
+// Search for food in USDA database
+app.get("/food-search", authMiddleware, async (req, res) => {
+  const { query } = req.query;
+
+  if (!query || query.trim().length === 0) {
+    return res.status(400).json({ error: "query parameter is required" });
+  }
+
+  try {
+    const results = await searchFood(query);
+    res.json({ results });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Log a meal
+app.post("/food-log", authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { meal_type, foods, meal_time } = req.body;
+
+  // Validation
+  if (!meal_type || !foods || !Array.isArray(foods) || foods.length === 0) {
+    return res.status(400).json({ 
+      error: "meal_type and foods array are required" 
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Create meal entry
+    const mealResult = await client.query(
+      `INSERT INTO meals (user_id, meal_time, source)
+       VALUES ($1, $2, $3)
+       RETURNING id`,
+      [userId, meal_time || new Date(), "manual"]
+    );
+
+    const mealId = mealResult.rows[0].id;
+    let totalInflammatoryLoad = 0;
+    const nutrientTotals = {};
+
+    // Process each food item
+    for (const food of foods) {
+      const { fdc_id, description, quantity, unit } = food;
+
+      if (!fdc_id || !quantity) {
+        throw new Error("Each food must have fdc_id and quantity");
+      }
+
+      // Get food details from USDA
+      const foodDetails = await getFoodDetails(fdc_id);
+
+      // Calculate inflammatory load
+      const inflammatoryData = calculateFoodInflammatoryLoad(
+        foodDetails.nutrients, 
+        quantity
+      );
+      totalInflammatoryLoad += inflammatoryData.inflammatory_score;
+
+      // Insert or get food from our database
+      const foodDbResult = await client.query(
+        `INSERT INTO foods (name, category, description)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
+        [
+          description || foodDetails.description,
+          foodDetails.category,
+          foodDetails.description
+        ]
+      );
+
+      const foodDbId = foodDbResult.rows[0].id;
+
+      // Create meal item
+      await client.query(
+        `INSERT INTO meal_items (meal_id, food_id, quantity, unit)
+         VALUES ($1, $2, $3, $4)`,
+        [mealId, foodDbId, quantity, unit || "g"]
+      );
+
+      // Aggregate nutrients
+      Object.keys(foodDetails.nutrients).forEach(nutrientKey => {
+        const nutrientData = foodDetails.nutrients[nutrientKey];
+        const scaledValue = (nutrientData.value / 100) * quantity;
+
+        if (!nutrientTotals[nutrientKey]) {
+          nutrientTotals[nutrientKey] = {
+            value: 0,
+            unit: nutrientData.unit
+          };
+        }
+        nutrientTotals[nutrientKey].value += scaledValue;
+      });
+    }
+
+    await client.query("COMMIT");
+
+    res.json({
+      meal_id: mealId,
+      meal_type,
+      foods_count: foods.length,
+      inflammatory_load: totalInflammatoryLoad,
+      inflammatory_classification:
+        totalInflammatoryLoad <= -5 ? "highly_anti_inflammatory" :
+        totalInflammatoryLoad <= -2 ? "anti_inflammatory" :
+        totalInflammatoryLoad <= 2 ? "neutral" :
+        totalInflammatoryLoad <= 5 ? "inflammatory" :
+        "highly_inflammatory",
+      nutrient_totals: nutrientTotals,
+      logged_at: new Date()
+    });
+
+  } catch (e) {
+    await client.query("ROLLBACK");
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Get nutrition summary
+app.get("/nutrition-summary", authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const { period = "week" } = req.query;
+
+  let dateFilter = "meal_time >= NOW() - INTERVAL '7 days'";
+  if (period === "day") {
+    dateFilter = "meal_time >= NOW() - INTERVAL '1 day'";
+  } else if (period === "month") {
+    dateFilter = "meal_time >= NOW() - INTERVAL '30 days'";
+  }
+
+  const client = await pool.connect();
+  try {
+    // Get all meals in period
+    const mealsResult = await client.query(
+      `SELECT m.id, m.meal_time, mi.food_id, mi.quantity, mi.unit, f.name as food_name
+       FROM meals m
+       JOIN meal_items mi ON m.id = mi.meal_id
+       JOIN foods f ON mi.food_id = f.id
+       WHERE m.user_id = $1 AND ${dateFilter}
+       ORDER BY m.meal_time DESC`,
+      [userId]
+    );
+
+    if (mealsResult.rows.length === 0) {
+      return res.json({
+        period,
+        total_meals: 0,
+        message: "No food logs found for this period"
+      });
+    }
+
+    // Group by meal
+    const meals = {};
+    mealsResult.rows.forEach(row => {
+      if (!meals[row.id]) {
+        meals[row.id] = {
+          meal_time: row.meal_time,
+          foods: []
+        };
+      }
+      meals[row.id].foods.push({
+        name: row.food_name,
+        quantity: row.quantity,
+        unit: row.unit
+      });
+    });
+
+    res.json({
+      period,
+      total_meals: Object.keys(meals).length,
+      meals: Object.values(meals).slice(0, 20)
+    });
+
   } catch (e) {
     res.status(500).json({ error: e.message });
   } finally {
