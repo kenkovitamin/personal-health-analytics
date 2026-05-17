@@ -1019,20 +1019,28 @@ app.post("/food-log", authMiddleware, async (req, res) => {
       );
       totalInflammatoryLoad += inflammatoryData.inflammatory_score;
 
-      // Insert or get food from our database
-      const foodDbResult = await client.query(
-        `INSERT INTO foods (name, category, description)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-         RETURNING id`,
-        [
-          description || foodDetails.description,
-          foodDetails.category,
-          foodDetails.description
-        ]
-      );
+    // Insert or get food from our database
+let foodDbId;
+const existingFood = await client.query(
+  `SELECT id FROM foods WHERE name = $1`,
+  [description || foodDetails.description]
+);
 
-      const foodDbId = foodDbResult.rows[0].id;
+if (existingFood.rows.length > 0) {
+  foodDbId = existingFood.rows[0].id;
+} else {
+  const foodDbResult = await client.query(
+    `INSERT INTO foods (name, category, description)
+     VALUES ($1, $2, $3)
+     RETURNING id`,
+    [
+      description || foodDetails.description,
+      foodDetails.category,
+      foodDetails.description
+    ]
+  );
+  foodDbId = foodDbResult.rows[0].id;
+}
 
       // Create meal item
       await client.query(
