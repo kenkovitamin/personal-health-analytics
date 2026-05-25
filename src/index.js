@@ -1223,6 +1223,113 @@ app.get("/nutrient-analysis", authMiddleware, async (req, res) => {
   }
 });
 
+/* =========================
+   DAILY NUTRIENT GOALS
+========================= */
+
+app.get("/daily-goals", authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
+  const client = await pool.connect();
+
+  try {
+    const mealsToday = await client.query(
+      `SELECT m.id, mi.food_id, mi.quantity, f.name
+       FROM meals m
+       JOIN meal_items mi ON m.id = mi.meal_id
+       JOIN foods f ON mi.food_id = f.id
+       WHERE m.user_id = $1 
+       AND m.meal_time >= CURRENT_DATE
+       AND m.meal_time < CURRENT_DATE + INTERVAL '1 day'`,
+      [userId]
+    );
+
+    const todayTotals = {
+      protein: 0,
+      fiber: 0,
+      omega3: 0,
+      vitaminD: 0,
+      vitaminC: 0,
+      calories: 0
+    };
+
+    const goals = {
+      protein: { target: 80, unit: "g", priority: "moderate" },
+      fiber: { target: 30, unit: "g", priority: "high" },
+      omega3: { target: 2, unit: "g", priority: "critical" },
+      vitaminD: { target: 50, unit: "µg", priority: "critical" },
+      vitaminC: { target: 100, unit: "mg", priority: "high" },
+      calories: { target: 2000, unit: "kcal", priority: "moderate" }
+    };
+
+    const progress = {};
+    Object.keys(goals).forEach(nutrient => {
+      const current = todayTotals[nutrient] || 0;
+      const target = goals[nutrient].target;
+      const percent = Math.min(100, (current / target) * 100);
+
+      progress[nutrient] = {
+        current: parseFloat(current.toFixed(2)),
+        target,
+        unit: goals[nutrient].unit,
+        percent: parseFloat(percent.toFixed(1)),
+        status: 
+          percent >= 100 ? "completed" :
+          percent >= 80 ? "on_track" :
+          percent >= 50 ? "half_way" :
+          "needs_attention",
+        priority: goals[nutrient].priority
+      };
+    });
+
+    const criticalNutrients = Object.keys(progress).filter(
+      k => progress[k].priority === "critical" && progress[k].percent < 80
+    );
+
+    const suggestions = [];
+    
+    if (progress.omega3.percent < 80) {
+      suggestions.push({
+        nutrient: "Omega-3",
+        current_gap: parseFloat((goals.omega3.target - todayTotals.omega3).toFixed(2)),
+        suggestion: "Add 100g salmon (2.5g omega-3) to reach your goal"
+      });
+    }
+
+    if (progress.fiber.percent < 80) {
+      suggestions.push({
+        nutrient: "Fiber",
+        current_gap: parseFloat((goals.fiber.target - todayTotals.fiber).toFixed(1)),
+        suggestion: "Add 2 cups vegetables (10g fiber) to reach your goal"
+      });
+    }
+
+    if (progress.vitaminD.percent < 80) {
+      suggestions.push({
+        nutrient: "Vitamin D",
+        current_gap: parseFloat((goals.vitaminD.target - todayTotals.vitaminD).toFixed(1)),
+        suggestion: "Add fortified milk or supplement to reach your goal"
+      });
+    }
+
+    res.json({
+      date: new Date().toISOString().split('T')[0],
+      meals_logged: mealsToday.rows.length,
+      progress,
+      critical_nutrients_needed: criticalNutrients,
+      suggestions,
+      overall_completion: parseFloat(
+        (Object.values(progress).reduce((sum, p) => sum + p.percent, 0) / 
+        Object.keys(progress).length).toFixed(1)
+      )
+    });
+
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
+
 /* ========================= */
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
